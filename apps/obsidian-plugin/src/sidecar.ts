@@ -40,12 +40,12 @@ export class SidecarManager {
     }
 
     if (!this.config.llm.apiKey || this.config.llm.apiKey === "sk-placeholder") {
-      new Notice("AI Learning Agent: Please configure your API key in settings (Ctrl+P → Settings → AI Learning Agent)", 0);
+      new Notice("AI Learning Agent: API key not configured. Open Settings → AI Learning Agent to set it.", 0);
       throw new Error("API key not configured");
     }
 
     if (!this.config.vaultPath) {
-      new Notice("AI Learning Agent: Please set your Vault path in plugin settings.", 0);
+      new Notice("AI Learning Agent: Vault path not set. Open Settings → AI Learning Agent.", 0);
       throw new Error("Vault path not configured");
     }
 
@@ -95,7 +95,7 @@ export class SidecarManager {
       this.process = null;
     });
 
-    await this.waitForHealth(15000);
+    await this.waitForHealth(30000);
   }
 
   async stop(): Promise<void> {
