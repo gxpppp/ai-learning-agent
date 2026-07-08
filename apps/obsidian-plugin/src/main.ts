@@ -3,6 +3,7 @@ import { DEFAULT_CONFIG } from "@ai-tutor/shared-types";
 import { Notice, Plugin } from "obsidian";
 import { CHAT_VIEW_TYPE, ChatView } from "./chat/ChatView";
 import { WORDCLOUD_VIEW_TYPE, WordCloudView } from "./knowledge/WordCloudView";
+import { TagSuggestService } from "./knowledge/TagSuggest";
 import { OCR_VIEW_TYPE, OcrView } from "./ocr/OcrView";
 import { AISettingsTab } from "./settings";
 import { SidecarManager } from "./sidecar";
@@ -90,6 +91,44 @@ export default class AILearningAgentPlugin extends Plugin {
         const leaf = this.app.workspace.getLeavesOfType(WORDCLOUD_VIEW_TYPE)[0];
         if (leaf?.view instanceof WordCloudView) {
           await leaf.view.refresh();
+        }
+      },
+    });
+
+    // Tag & link commands
+    this.addCommand({
+      id: "suggest-tags",
+      name: "AI: Suggest tags for current note",
+      callback: async () => {
+        const file = this.app.workspace.getActiveFile();
+        if (!file) { new Notice("No active note"); return; }
+        const service = new TagSuggestService(this.settings.server.port);
+        try {
+          const result = await service.suggestTags(file.path);
+          new Notice(`Suggested tags: ${result.tags.join(", ")} (${(result.confidence * 100).toFixed(0)}%)`);
+        } catch (e) {
+          new Notice(`Tag suggestion failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      },
+    });
+
+    this.addCommand({
+      id: "recommend-links",
+      name: "AI: Recommend links for current note",
+      callback: async () => {
+        const file = this.app.workspace.getActiveFile();
+        if (!file) { new Notice("No active note"); return; }
+        const service = new TagSuggestService(this.settings.server.port);
+        try {
+          const result = await service.recommendLinks(file.path);
+          if (result.links.length === 0) {
+            new Notice("No link recommendations found.");
+            return;
+          }
+          const items = result.links.map((l) => `- [[${l.target}]] (${(l.score * 100).toFixed(0)}%)`);
+          new Notice(`Recommended links:\n${items.join("\n")}`, 0);
+        } catch (e) {
+          new Notice(`Link recommendation failed: ${e instanceof Error ? e.message : String(e)}`);
         }
       },
     });

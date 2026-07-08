@@ -15,6 +15,7 @@ from app.config import LLM_MODEL
 from app.models.rag import RagQueryRequest
 from app.services.embedding import EmbeddingClient
 from app.services.llm_client import client
+from app.services.prompts import TUTOR_SYSTEM_PROMPT
 from app.services.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -55,11 +56,11 @@ async def _rag_stream(
     context = "\n\n".join(context_parts)
 
     system_prompt = (
-        "You are an AI tutor with access to the user's personal knowledge base. "
-        "Use the provided context to answer the question. "
+        f"{TUTOR_SYSTEM_PROMPT}\n\n"
+        f"Use the following context from the user's notes to answer:\n\n"
+        f"{context}\n\n"
         "Cite sources using [Source N] notation. "
-        "If the context does not contain the answer, say so and offer a general answer.\n\n"
-        f"Context:\n{context}"
+        "If the context does not contain the answer, say so and offer a general answer."
     )
 
     messages: list[dict[str, Any]] = [

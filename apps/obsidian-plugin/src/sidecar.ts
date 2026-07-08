@@ -1,5 +1,6 @@
 import { type ChildProcess, execSync, spawn } from "node:child_process";
 import * as path from "node:path";
+import { Notice } from "obsidian";
 import type { IAppConfig } from "@ai-tutor/shared-types";
 
 export class SidecarManager {
@@ -11,6 +12,42 @@ export class SidecarManager {
   }
 
   async start(): Promise<void> {
+    const projectRoot = this.getProjectRoot();
+
+    // Startup wizard: verify prerequisites
+    const pyprojectPath = path.join(projectRoot, "pyproject.toml");
+    if (!this.fileExists(pyprojectPath)) {
+      new Notice(
+        "AI Learning Agent: Backend not installed. Run install.ps1 first. " +
+          `Expected backend at: ${projectRoot}`,
+        0,
+      );
+      throw new Error(`Backend not found at ${projectRoot}`);
+    }
+
+    const venvPath = path.join(projectRoot, ".venv");
+    if (!this.dirExists(venvPath)) {
+      new Notice("AI Learning Agent: Installing Python dependencies (uv sync)...");
+      try {
+        this.runSync("uv", ["sync"], { cwd: projectRoot });
+        new Notice("AI Learning Agent: Dependencies installed.");
+      } catch {
+        new Notice("AI Learning Agent: Failed to install dependencies. Is uv installed? Run `uv sync` manually in backend/.");
+        throw new Error("uv sync failed");
+      }
+    }
+
+    if (!this.config.llm.apiKey || this.config.llm.apiKey === "sk-placeholder") {
+      new Notice("AI Learning Agent: Please configure your API key in settings (Ctrl+P → Settings → AI Learning Agent)", 0);
+      throw new Error("API key not configured");
+    }
+
+    if (!this.config.vaultPath) {
+      new Notice("AI Learning Agent: Please set your Vault path in plugin settings.", 0);
+      throw new Error("Vault path not configured");
+    }
+
+    // Start backend
     const { port, host } = this.config.server;
     const env = {
       ...process.env,
@@ -22,7 +59,6 @@ export class SidecarManager {
       OBSIDIAN_VAULT_PATH: this.config.vaultPath,
     };
 
-    const projectRoot = this.getProjectRoot();
     const pythonExe =
       process.platform === "win32"
         ? path.join(projectRoot, ".venv", "Scripts", "python.exe")
@@ -57,7 +93,7 @@ export class SidecarManager {
       this.process = null;
     });
 
-    await this.waitForHealth(10000);
+    await this.waitForHealth(15000);
   }
 
   async stop(): Promise<void> {
@@ -106,15 +142,33 @@ export class SidecarManager {
   }
 
   private getProjectRoot(): string {
-    try {
-      const base = typeof __dirname !== "undefined" && __dirname ? __dirname : ".";
-      return path.resolve(base, "..", "..", "..", "python", "backend");
-    } catch {
-      return path.resolve("python", "backend");
-    }
+    const base = typeof __dirname !== "undefined" && __dirname ? __dirname : ".";
+    return path.resolve(base, "backend");
   }
 
   private getSourceDir(): string {
     return path.join(this.getProjectRoot(), "src");
+  }
+
+  private fileExists(p: string): boolean {
+    try {
+      const fs = require("node:fs");
+      return fs.existsSync(p) && fs.statSync(p).isFile();
+    } catch {
+      return false;
+    }
+  }
+
+  private dirExists(p: string): boolean {
+    try {
+      const fs = require("node:fs");
+      return fs.existsSync(p) && fs.statSync(p).isDirectory();
+    } catch {
+      return false;
+    }
+  }
+
+  private runSync(cmd: string, args: string[], opts: Record<string, unknown>): void {
+    execSync(`${cmd} ${args.join(" ")}`, { stdio: "inherit", ...opts });
   }
 }
