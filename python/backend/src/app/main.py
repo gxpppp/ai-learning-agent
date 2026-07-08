@@ -14,8 +14,10 @@ from app.config import (
     OBSIDIAN_VAULT_PATH,
     PROVIDERS_JSON,
     RAG_ENABLED,
+    TOOL_PERMISSIONS,
     VERSION,
 )
+from app.routes.agent import router as agent_router
 from app.routes.chat import router as chat_router
 from app.routes.health import router as health_router
 from app.routes.notes import router as notes_router
@@ -117,6 +119,7 @@ app.include_router(tags_router)
 app.include_router(vault_router)
 app.include_router(wordcloud_router)
 app.include_router(models_router)
+app.include_router(agent_router)
 
 
 @app.get("/")

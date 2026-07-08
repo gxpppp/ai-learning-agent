@@ -1,13 +1,10 @@
-/** AI Chat panel — ItemView with streaming SSE chat, conversation history,
- *  smart auto-scroll, and Markdown file persistence.
- */
+/** AI Chat panel — Agent SSE with tool call rendering, model dropdown, conversation history. */
 
 import type { IChatMessage } from "@ai-tutor/shared-types";
 import { type App, ItemView, Notice, type WorkspaceLeaf } from "obsidian";
 import type AILearningAgentPlugin from "../main";
-import { ragQuery } from "../rag/RagService";
 import { MessageRenderer } from "./MessageRenderer";
-import { streamChat } from "./sse-client";
+import { ToolCallRenderer } from "./ToolCallRenderer";
 
 export const CHAT_VIEW_TYPE = "ai-learning-chat";
 
@@ -31,7 +28,6 @@ export class ChatView extends ItemView {
   private isStreaming = false;
   private userScrolledUp = false;
   private readonly SCROLL_THRESHOLD = 50;
-
   private currentChatFile: string | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: AILearningAgentPlugin) {
@@ -41,24 +37,15 @@ export class ChatView extends ItemView {
     this.navigation = false;
   }
 
-  getViewType(): string {
-    return CHAT_VIEW_TYPE;
-  }
-
-  getDisplayText(): string {
-    return "AI Tutor";
-  }
-
-  getIcon(): string {
-    return "message-square";
-  }
+  getViewType(): string { return CHAT_VIEW_TYPE; }
+  getDisplayText(): string { return "AI Tutor"; }
+  getIcon(): string { return "message-square"; }
 
   async onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("ai-chat-container");
 
-    // Model selector dropdown
     const modelBar = container.createDiv({ cls: "ai-chat-model-bar" });
     const models = this.plugin.settings.providers?.flatMap((p) => p.models || []) || [];
     if (models.length > 0) {
@@ -77,86 +64,55 @@ export class ChatView extends ItemView {
 
     this.buildMessageArea(container);
     this.buildInputBar(container);
-
     await this.loadLastSession();
   }
 
   async onClose(): Promise<void> {
     this.abortStreaming();
-    if (this.messages.length > 0) {
-      await this.saveSession();
-    }
+    if (this.messages.length > 0) await this.saveSession();
   }
-
-  // ─── DOM Construction ────────────────────────────────────────
 
   private buildMessageArea(container: HTMLElement): void {
     this.messagesEl = container.createDiv({ cls: "ai-chat-messages" });
-
     this.messagesEl.addEventListener("scroll", () => {
       const { scrollTop, scrollHeight, clientHeight } = this.messagesEl;
-      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-      this.userScrolledUp = distanceFromBottom > this.SCROLL_THRESHOLD;
+      this.userScrolledUp = scrollHeight - scrollTop - clientHeight > this.SCROLL_THRESHOLD;
     });
   }
 
   private buildInputBar(container: HTMLElement): void {
     const inputBar = container.createDiv({ cls: "ai-chat-input-bar" });
-
     this.inputEl = inputBar.createEl("textarea", {
-      attr: {
-        placeholder: "Ask your AI tutor anything... (Enter to send, Shift+Enter for newline)",
-        rows: "1",
-      },
+      attr: { placeholder: "Ask your AI tutor anything...", rows: "1" },
       cls: "ai-chat-input",
     });
-
     this.inputEl.addEventListener("input", () => {
       this.inputEl.style.height = "auto";
       this.inputEl.style.height = `${Math.min(this.inputEl.scrollHeight, 200)}px`;
     });
-
     this.inputEl.addEventListener("keydown", (evt: KeyboardEvent) => {
-      if (evt.key === "Enter" && !evt.shiftKey) {
-        evt.preventDefault();
-        this.sendMessage();
-      }
-      if (evt.key === "Escape" && this.isStreaming) {
-        evt.preventDefault();
-        this.abortStreaming();
-      }
+      if (evt.key === "Enter" && !evt.shiftKey) { evt.preventDefault(); this.sendMessage(); }
+      if (evt.key === "Escape" && this.isStreaming) { evt.preventDefault(); this.abortStreaming(); }
     });
-
     const btnRow = inputBar.createDiv({ cls: "ai-chat-btn-row" });
-
     this.stopBtn = btnRow.createEl("button", { cls: "ai-chat-stop-btn", text: "Stop" });
     this.stopBtn.addEventListener("click", () => this.abortStreaming());
     this.stopBtn.style.display = "none";
-
     this.sendBtn = btnRow.createEl("button", { cls: "ai-chat-send-btn mod-cta", text: "Send" });
     this.sendBtn.addEventListener("click", () => this.sendMessage());
   }
-
-  // ─── Streaming UI State ──────────────────────────────────────
 
   private setStreamingMode(active: boolean): void {
     this.isStreaming = active;
     this.sendBtn.style.display = active ? "none" : "";
     this.stopBtn.style.display = active ? "" : "none";
-    if (active) {
-      this.inputEl.setAttribute("disabled", "true");
-    } else {
-      this.inputEl.removeAttribute("disabled");
-      this.inputEl.focus();
-    }
+    if (active) this.inputEl.setAttribute("disabled", "true");
+    else { this.inputEl.removeAttribute("disabled"); this.inputEl.focus(); }
   }
-
-  // ─── Message Sending & Streaming ─────────────────────────────
 
   async sendMessage(): Promise<void> {
     const content = this.inputEl.value.trim();
     if (!content || this.isStreaming) return;
-
     this.inputEl.value = "";
     this.inputEl.style.height = "auto";
 
@@ -173,85 +129,21 @@ export class ChatView extends ItemView {
     this.forceScrollToBottom();
 
     const port = this.plugin.settings.server.port;
+    const toolRenderer = new ToolCallRenderer(this.messagesEl);
 
     try {
-      let responseText = "";
-      let sources: Array<{ note_path: string; content: string; score: number }> = [];
-
-      responseText = await ragQuery(
-        content,
-        `http://127.0.0.1:${port}`,
-        {
-          onToken: (token: string) => {
-            this.renderer.appendToken(token);
-            this.scrollToBottomIfDesired();
-          },
-          onSource: (srcs) => {
-            sources = srcs;
-          },
-          onError: (msg: string) => {
-            if (!msg.includes("503")) {
-              new Notice(`RAG error: ${msg}`);
-            }
-          },
-          onDone: () => {},
-        },
-        this.abortController.signal,
-      );
-
-      // Append source citations
-      if (sources.length > 0) {
-        const citationMd = sources
-          .map(
-            (s, i) =>
-              `> [${i + 1}] **${s.note_path}** (${(s.score * 100).toFixed(0)}%)\n> ${s.content.trim()}`,
-          )
-          .join("\n\n");
-        responseText += `\n\n---\n**Sources:**\n${citationMd}`;
-        this.renderer.appendToken(`\n\n---\n**Sources:**\n${citationMd}`);
-        this.scrollToBottomIfDesired();
-      }
-
+      const responseText = await this.agentStream(content, port, toolRenderer);
       await this.renderer.finishStreaming();
       this.addMessage("assistant", responseText);
       await this.saveSession();
     } catch (err: unknown) {
-      // Fallback to direct chat if RAG fails
-      let fellBack = true;
+      await this.renderer.finishStreaming();
       try {
-        const fullContent: IChatMessage[] = [
-          { role: "system" as const, content: "You are an AI tutor. Use Socratic questioning." },
-          ...this.messages.map((m) => ({
-            role: m.role as "system" | "user" | "assistant",
-            content: m.content,
-          })),
-        ];
-        const fallbackText = await streamChat(
-          fullContent,
-          {
-            onToken: (t: string) => {
-              this.renderer.appendToken(t);
-              this.scrollToBottomIfDesired();
-            },
-            onError: () => {},
-            onDone: () => {},
-          },
-          {
-            baseUrl: `http://127.0.0.1:${port}`,
-            model: this.plugin.settings.activeChatModel || "deepseek-chat",
-            signal: this.abortController?.signal,
-          },
-        );
-        fellBack = false;
+        const fb = await this.chatFallback(content, port);
         await this.renderer.finishStreaming();
-        this.addMessage("assistant", fallbackText);
+        this.addMessage("assistant", fb);
         await this.saveSession();
       } catch {
-        // both failed
-      }
-
-      if (fellBack) {
-        await this.renderer.finishStreaming();
         const msg = err instanceof Error ? err.message : String(err);
         this.renderer.renderError(assistantMsgEl, msg);
       }
@@ -261,19 +153,75 @@ export class ChatView extends ItemView {
     }
   }
 
-  abortStreaming(): void {
-    this.abortController?.abort();
+  private async agentStream(content: string, port: number, toolRenderer: ToolCallRenderer): Promise<string> {
+    const resp = await fetch(`http://127.0.0.1:${port}/api/agent/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversation: this.messages.map((m) => ({ role: m.role, content: m.content })),
+        content,
+      }),
+      signal: this.abortController!.signal,
+    });
+    if (!resp.ok) throw new Error(`Agent error (${resp.status})`);
+    if (!resp.body) throw new Error("No response body");
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    let fullText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() ?? "";
+      for (const part of parts) {
+        if (!part.trim()) continue;
+        const lines = part.split("\n");
+        let eventType = "message";
+        let dataPayload = "";
+        for (const line of lines) {
+          if (line.startsWith("event:")) eventType = line.slice(6).trim();
+          else if (line.startsWith("data:")) dataPayload = line.slice(5).trim();
+        }
+        if (dataPayload === "[DONE]") return fullText;
+        try {
+          const parsed = JSON.parse(dataPayload);
+          if (eventType === "token" && parsed.content) {
+            fullText += parsed.content;
+            this.renderer.appendToken(parsed.content);
+            this.scrollToBottomIfDesired();
+          } else if (eventType === "tool_call") {
+            toolRenderer.renderToolCall(parsed);
+            this.scrollToBottomIfDesired();
+          } else if (eventType === "tool_result") {
+            await toolRenderer.renderToolResult(parsed, this.app, this);
+            this.scrollToBottomIfDesired();
+          }
+        } catch { /* skip */ }
+      }
+    }
+    return fullText;
   }
 
-  // ─── Message Storage ─────────────────────────────────────────
+  private async chatFallback(content: string, port: number): Promise<string> {
+    const { streamChat } = await import("./sse-client");
+    const msgs: IChatMessage[] = [
+      { role: "system", content: "You are an AI tutor. Be concise and helpful." },
+      ...this.messages.map((m) => ({ role: m.role as "system" | "user" | "assistant", content: m.content })),
+    ];
+    return streamChat(msgs,
+      { onToken: (t) => { this.renderer.appendToken(t); this.scrollToBottomIfDesired(); }, onError: () => {}, onDone: () => {} },
+      { baseUrl: `http://127.0.0.1:${port}`, model: this.plugin.settings.activeChatModel || "deepseek-chat", signal: this.abortController?.signal },
+    );
+  }
+
+  abortStreaming(): void { this.abortController?.abort(); }
 
   private addMessage(role: "user" | "assistant" | "system", content: string): ChatMessage {
-    const msg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role,
-      content,
-      timestamp: Date.now(),
-    };
+    const msg: ChatMessage = { id: crypto.randomUUID(), role, content, timestamp: Date.now() };
     this.messages.push(msg);
     return msg;
   }
@@ -286,96 +234,55 @@ export class ChatView extends ItemView {
 
   renderAllMessages(): void {
     this.messagesEl.empty();
-    for (const msg of this.messages) {
-      this.renderMessageToDOM(msg);
-    }
+    for (const msg of this.messages) this.renderMessageToDOM(msg);
     this.forceScrollToBottom();
   }
-
-  // ─── Conversation Persistence (Markdown files) ───────────────
 
   private readonly CHAT_FOLDER = "AI Chat Logs";
 
   private async saveSession(): Promise<void> {
     if (this.messages.length === 0) return;
-
     try {
       await this.ensureFolder(this.CHAT_FOLDER);
-
       if (!this.currentChatFile) {
-        const date = new Date().toISOString().slice(0, 10);
-        this.currentChatFile = `${this.CHAT_FOLDER}/Chat - ${date}.md`;
+        this.currentChatFile = `${this.CHAT_FOLDER}/Chat - ${new Date().toISOString().slice(0, 10)}.md`;
       }
-
-      let md = "---\n";
-      md += `session_date: ${new Date().toISOString()}\n`;
-      md += `message_count: ${this.messages.length}\n`;
-      md += `model: ${this.plugin.settings.activeChatModel || "unknown"}\n`;
-      md += "---\n\n";
-
-      for (const msg of this.messages) {
-        const roleIcon = msg.role === "user" ? "You" : "AI Tutor";
-        md += `### ${roleIcon}\n\n${msg.content}\n\n---\n\n`;
-      }
-
+      let md = `---\nsession_date: ${new Date().toISOString()}\nmessage_count: ${this.messages.length}\nmodel: ${this.plugin.settings.activeChatModel || "unknown"}\n---\n\n`;
+      for (const msg of this.messages) md += `### ${msg.role === "user" ? "You" : "AI Tutor"}\n\n${msg.content}\n\n---\n\n`;
       await this.app.vault.adapter.write(this.currentChatFile, md);
-    } catch (err) {
-      console.error("[ai-tutor] Failed to save chat session:", err);
-    }
+    } catch (err) { console.error("[ai-tutor] save failed:", err); }
   }
 
   private async loadLastSession(): Promise<void> {
     try {
       await this.ensureFolder(this.CHAT_FOLDER);
-
       const files = await this.app.vault.adapter.list(this.CHAT_FOLDER);
-      if (files.files.length === 0) return;
-
-      const mdFiles = files.files
-        .filter((f) => f.endsWith(".md"))
-        .sort()
-        .reverse();
-
-      const latest = mdFiles[0];
-      if (!latest) return;
-
-      const content = await this.app.vault.adapter.read(latest);
-      this.currentChatFile = latest;
+      const mdFiles = files.files.filter((f) => f.endsWith(".md")).sort().reverse();
+      if (!mdFiles[0]) return;
+      const content = await this.app.vault.adapter.read(mdFiles[0]);
+      this.currentChatFile = mdFiles[0];
       this.messages = this.parseMarkdownToMessages(content);
       this.renderAllMessages();
-    } catch (err) {
-      console.error("[ai-tutor] Failed to load chat session:", err);
-    }
+    } catch (err) { console.error("[ai-tutor] load failed:", err); }
   }
 
   private parseMarkdownToMessages(md: string): ChatMessage[] {
     const messages: ChatMessage[] = [];
     const sections = md.split(/\n### (You|AI Tutor)\n\n/);
-
     for (let i = 1; i < sections.length; i += 2) {
-      const roleStr = sections[i];
       let content = (sections[i + 1] ?? "").trim();
       content = content.replace(/\n---\n\n$/, "").replace(/\n---$/, "");
-
-      const role = roleStr === "You" ? "user" : "assistant";
-      messages.push({
-        id: crypto.randomUUID(),
-        role,
-        content,
-        timestamp: Date.now(),
-      });
+      messages.push({ id: crypto.randomUUID(), role: sections[i] === "You" ? "user" : "assistant", content, timestamp: Date.now() });
     }
     return messages;
   }
 
   private async ensureFolder(folderPath: string): Promise<void> {
-    const exists = await this.app.vault.adapter.exists(folderPath);
-    if (!exists) {
+    if (!(await this.app.vault.adapter.exists(folderPath))) {
       await this.app.vault.createFolder(folderPath);
     }
   }
 
-  /** Clear current conversation and start fresh. */
   async newSession(): Promise<void> {
     await this.saveSession();
     this.messages = [];
@@ -383,19 +290,13 @@ export class ChatView extends ItemView {
     this.messagesEl.empty();
   }
 
-  // ─── Scroll Helpers ──────────────────────────────────────────
-
   private forceScrollToBottom(): void {
     this.userScrolledUp = false;
-    requestAnimationFrame(() => {
-      this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
-    });
+    requestAnimationFrame(() => { this.messagesEl.scrollTop = this.messagesEl.scrollHeight; });
   }
 
   private scrollToBottomIfDesired(): void {
     if (this.userScrolledUp) return;
-    requestAnimationFrame(() => {
-      this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
-    });
+    requestAnimationFrame(() => { this.messagesEl.scrollTop = this.messagesEl.scrollHeight; });
   }
 }

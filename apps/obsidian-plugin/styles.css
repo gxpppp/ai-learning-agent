@@ -265,3 +265,71 @@
   margin-top: 8px;
   text-align: center;
 }
+
+/* ─── Tool Call Cards ─────────────────────────────────────── */
+.ai-tool-call-card {
+  margin: 6px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  font-size: 0.75em;
+  max-width: 95%;
+  align-self: flex-start;
+}
+
+.ai-tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.ai-tool-call-icon {
+  font-size: 14px;
+}
+
+.ai-tool-call-name {
+  flex: 1;
+}
+
+.ai-tool-call-time {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.ai-tool-call-args {
+  margin-top: 4px;
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-tool-call-body {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--background-modifier-border);
+  display: block;
+}
+
+.ai-tool-call-content {
+  color: var(--text-normal);
+  line-height: 1.4;
+}
+
+.ai-tool-call-content p { margin: 2px 0; }
+.ai-tool-call-content ul { margin: 2px 0; padding-left: 16px; }
+
+.ai-tool-call-error {
+  color: var(--text-error);
+  font-style: italic;
+}
+
+.ai-tool-call-done {
+  border-left: 3px solid var(--interactive-accent);
+}
