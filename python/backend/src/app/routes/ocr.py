@@ -1,15 +1,14 @@
-"""OCR endpoints — local PaddleOCR-VL model or vLLM API."""
+"""OCR endpoints using local PaddleOCR (traditional, CPU)."""
 
 from __future__ import annotations
 
-import base64
 import logging
 import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from app.config import OCR_ENABLED, OCR_MODEL, OCR_SERVER_URL
+from app.config import OCR_ENABLED
 from app.models.ocr import (
     OcrHealthResponse,
     OcrParseAndSaveRequest,
@@ -17,170 +16,76 @@ from app.models.ocr import (
     OcrParseRequest,
     OcrParseResponse,
 )
-from app.services.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ocr", tags=["ocr"])
 
-ocr_client = LLMClient(base_url=OCR_SERVER_URL, api_key="not-needed", model=OCR_MODEL)
+SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".webp"}
 
-TASK_PROMPTS = {
-    "ocr": "OCR:",
-    "table": "Table Recognition:",
-    "formula": "Formula Recognition:",
-    "chart": "Chart Recognition:",
-}
-
-SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".webp", ".pdf"}
-
-_local_model = None
-_local_processor = None
-_local_ready = False
+_ocr_engine = None
 
 
-def _get_local_model_path() -> str:
-    """Get the local PaddleOCR-VL model path."""
-    backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    return os.path.join(backend_dir, "models", "paddleocr-vl")
+def _get_ocr():
+    """Lazy-load PaddleOCR engine."""
+    global _ocr_engine
+    if _ocr_engine is None:
+        import os, glob, platform
+        # PaddlePaddle needs CUDNN 9.9+; prefer pip-installed DLLs over system
+        if platform.system() == "Windows":
+            site_packages = os.path.dirname(os.path.dirname(__file__))
+            for cudnn_bin in glob.glob(os.path.join(site_packages, "..", ".venv", "Lib", "site-packages", "nvidia", "cudnn", "bin")):
+                os.add_dll_directory(os.path.abspath(cudnn_bin))
+                break
+        from paddleocr import PaddleOCR
+        _ocr_engine = PaddleOCR(lang="ch", use_angle_cls=True)
+        logger.info("PaddleOCR engine loaded")
+    return _ocr_engine
 
 
-def _load_local_model() -> None:
-    """Lazy-load the local PaddleOCR-VL model (pyTorch)."""
-    global _local_model, _local_processor, _local_ready
-    if _local_ready:
-        return
+async def _call_ocr(file_path: str, _task: str = "ocr") -> str:
+    """Extract text from image using PaddleOCR."""
+    ocr = _get_ocr()
+    results = ocr.ocr(file_path)
+    if not results:
+        return ""
 
-    model_path = _get_local_model_path()
-    if not os.path.isdir(model_path):
-        logger.warning("Local PaddleOCR-VL not found at %s", model_path)
-        return
-
-    try:
-        import torch
-        from transformers import AutoModel, AutoProcessor
-
-        _local_processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
-        _local_model = AutoModel.from_pretrained(
-            model_path,
-            trust_remote_code=True,
-            dtype=torch.float16,
-            device_map="auto",
-        )
-        _local_ready = True
-        logger.info("Local PaddleOCR-VL loaded (%s)", model_path)
-    except Exception as e:
-        logger.warning("Failed to load local PaddleOCR-VL: %s", e)
-
-
-def _read_file_as_base64(file_path: str) -> tuple[str, str]:
-    path = Path(file_path)
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
-
-    ext = path.suffix.lower()
-    if ext not in SUPPORTED_EXTENSIONS:
-        supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
-        raise HTTPException(
-            status_code=422,
-            detail=f"Unsupported file type: {ext}. Supported: {supported}",
-        )
-
-    mime_map = {
-        ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-        ".bmp": "image/bmp", ".tiff": "image/tiff", ".tif": "image/tiff",
-        ".webp": "image/webp", ".pdf": "application/pdf",
-    }
-    mime_type = mime_map.get(ext, "application/octet-stream")
-
-    with open(file_path, "rb") as f:
-        data = base64.b64encode(f.read()).decode("utf-8")
-    return data, mime_type
-
-
-async def _call_ocr_local(file_path: str, task: str) -> str:
-    """OCR using local PaddleOCR-VL model."""
-    if not _local_ready:
-        _load_local_model()
-    if not _local_model:
-        raise HTTPException(status_code=503, detail="Local OCR model not available")
-
-    from PIL import Image
-    import torch
-
-    img = Image.open(file_path).convert("RGB")
-    prompt = TASK_PROMPTS.get(task, TASK_PROMPTS["ocr"])
-    messages = [
-        {"role": "user", "content": [
-            {"type": "image", "image": img},
-            {"type": "text", "text": prompt},
-        ]},
-    ]
-    inputs = _local_processor.apply_chat_template(
-        messages, add_generation_prompt=True, tokenize=True,
-        return_dict=True, return_tensors="pt",
-    ).to(_local_model.device)  # type: ignore[union-attr]
-
-    with torch.no_grad():
-        outputs = _local_model.generate(**inputs, max_new_tokens=2048, do_sample=False)
-
-    result = _local_processor.decode(outputs[0], skip_special_tokens=True)  # type: ignore[union-attr]
-    # Strip the prompt from the output
-    if prompt in result:
-        result = result.split(prompt, 1)[-1].strip()
-    return result
-
-
-async def _call_ocr(file_path: str, task: str) -> str:
-    """Send file to PaddleOCR-VL (local model preferred, vLLM fallback)."""
-    # Try local model first
-    try:
-        _load_local_model()
-        if _local_ready:
-            return await _call_ocr_local(file_path, task)
-    except Exception as e:
-        logger.warning("Local OCR failed, trying vLLM: %s", e)
-
-    # Fallback to vLLM/Docker
-    img_b64, mime_type = _read_file_as_base64(file_path)
-    prompt_text = TASK_PROMPTS.get(task, TASK_PROMPTS["ocr"])
-    try:
-        response = await ocr_client.async_client.chat.completions.create(
-            model=OCR_MODEL,
-            messages=[
-                {"role": "user", "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{img_b64}"}},
-                    {"type": "text", "text": prompt_text},
-                ]},
-            ],
-            temperature=0.0,
-        )
-        return response.choices[0].message.content or ""
-    except Exception as exc:
-        logger.exception("OCR request failed")
-        raise HTTPException(status_code=502, detail=f"OCR service error: {exc}") from exc
+    lines: list[str] = []
+    for page in results:
+        if hasattr(page, "json"):
+            data = page.json
+            res = data.get("res", data)
+            rec_texts = res.get("rec_texts", [])
+            if isinstance(rec_texts, list):
+                for text in rec_texts:
+                    if isinstance(text, str) and text.strip():
+                        lines.append(text.strip())
+                    elif isinstance(text, list):
+                        for t in text:
+                            if isinstance(t, str) and t.strip():
+                                lines.append(t.strip())
+    return "\n".join(lines)
 
 
 @router.get("/health", response_model=OcrHealthResponse)
 async def ocr_health() -> OcrHealthResponse:
     if not OCR_ENABLED:
         raise HTTPException(status_code=503, detail="OCR service is disabled")
-    _load_local_model()
-    if _local_ready:
-        return OcrHealthResponse(status="ok", model="PaddleOCR-VL-0.9B (local)", server="local")
     try:
-        await ocr_client.async_client.models.list()
-        return OcrHealthResponse(status="ok", model=OCR_MODEL, server=OCR_SERVER_URL)
-    except Exception:
-        return OcrHealthResponse(status="ok", model="not-connected", server="none")
+        _get_ocr()
+        return OcrHealthResponse(status="ok", model="PaddleOCR (local)", server="local")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 @router.post("/parse", response_model=OcrParseResponse)
 async def parse_document(body: OcrParseRequest) -> OcrParseResponse:
     if not OCR_ENABLED:
         raise HTTPException(status_code=503, detail="OCR service is disabled")
-    if body.task not in TASK_PROMPTS:
-        raise HTTPException(status_code=422, detail=f"Invalid task: {body.task}")
+
+    ext = Path(body.file_path).suffix.lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(status_code=422, detail=f"Unsupported type: {ext}")
 
     markdown = await _call_ocr(body.file_path, body.task)
     return OcrParseResponse(success=True, markdown=markdown)
@@ -190,8 +95,10 @@ async def parse_document(body: OcrParseRequest) -> OcrParseResponse:
 async def parse_and_save(body: OcrParseAndSaveRequest) -> OcrParseAndSaveResponse:
     if not OCR_ENABLED:
         raise HTTPException(status_code=503, detail="OCR service is disabled")
-    if body.task not in TASK_PROMPTS:
-        raise HTTPException(status_code=422, detail=f"Invalid task: {body.task}")
+
+    ext = Path(body.file_path).suffix.lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(status_code=422, detail=f"Unsupported type: {ext}")
 
     markdown = await _call_ocr(body.file_path, body.task)
 
