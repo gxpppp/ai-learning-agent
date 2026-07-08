@@ -8,15 +8,14 @@ import os
 from datetime import UTC, datetime
 from typing import Any
 
+from app.config import CHUNK_OVERLAP, CHUNK_SIZE
 from app.services.embedding import EmbeddingClient
 from app.services.vector_store import VectorStore
 
 INDEX_STATE = "index_state.json"
-CHUNK_SIZE = 512
-CHUNK_OVERLAP = 64
 
 
-def _split_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+def _split_text(text: str, chunk_size: int = 512, overlap: int = 64) -> list[str]:
     """Simple recursive character text splitter."""
     if len(text) <= chunk_size:
         return [text] if text.strip() else []
@@ -77,6 +76,8 @@ def index_note(
     vault_path: str,
     embedding: EmbeddingClient,
     store: VectorStore,
+    chunk_size: int = CHUNK_SIZE,
+    overlap: int = CHUNK_OVERLAP,
 ) -> int:
     """Index a single note. Returns number of chunks indexed."""
     with open(file_path, encoding="utf-8") as f:
@@ -88,7 +89,7 @@ def index_note(
     rel_path = os.path.relpath(file_path, vault_path).replace("\\", "/")
     store.delete_by_note(rel_path)
 
-    chunks = _split_text(text)
+    chunks = _split_text(text, chunk_size, overlap)
     if not chunks:
         return 0
 

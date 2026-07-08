@@ -90,10 +90,11 @@ export class SidecarManager {
   private async waitForHealth(timeoutMs: number): Promise<void> {
     const start = Date.now();
     const port = this.config.server.port;
+    const host = this.config.server.host;
 
     while (Date.now() - start < timeoutMs) {
       try {
-        const resp = await fetch(`http://127.0.0.1:${port}/api/health`);
+        const resp = await fetch(`http://${host}:${port}/api/health`);
         if (resp.ok) return;
       } catch {
         // server not ready yet

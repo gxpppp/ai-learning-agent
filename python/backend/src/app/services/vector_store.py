@@ -63,20 +63,29 @@ class VectorStore:
     def hybrid_search(
         self, query_vector: list[float], query_text: str, top_k: int = 5
     ) -> list[dict]:
+        # Vector search first, then text-based rerank
         results = (
-            self.table.search(query_vector, query_type="hybrid")
+            self.table.search(query_vector)
             .metric("cosine")
-            .limit(top_k)
+            .limit(top_k * 3)
             .to_list()
         )
-        return [
-            {
-                "note_path": r["note_path"],
-                "content": r["content"],
-                "score": float(r["_distance"]),
-            }
-            for r in results
-        ]
+        # Client-side text filter: boost chunks containing query terms
+        query_terms = set(query_text.lower().split())
+        scored: list[dict] = []
+        for r in results:
+            content_lower = r["content"].lower()
+            matches = sum(1 for t in query_terms if t in content_lower)
+            boost = 1.0 + matches * 0.1
+            scored.append(
+                {
+                    "note_path": r["note_path"],
+                    "content": r["content"],
+                    "score": round(float(r["_distance"]) / boost, 4),
+                }
+            )
+        scored.sort(key=lambda x: x["score"], reverse=True)
+        return scored[:top_k]
 
     def add_chunks(self, records: list[dict]) -> None:
         rows = []
@@ -94,8 +103,9 @@ class VectorStore:
         self.table.add(rows)
 
     def delete_by_note(self, note_path: str) -> None:
+        escaped = note_path.replace("'", "''")
         try:
-            self.table.delete(f"note_path = '{note_path}'")
+            self.table.delete(f"note_path = '{escaped}'")
         except Exception:
             pass
 

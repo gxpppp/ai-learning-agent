@@ -151,11 +151,18 @@ async def parse_and_save(body: OcrParseAndSaveRequest) -> OcrParseAndSaveRespons
         stem = Path(body.file_path).stem
         filename = f"{stem}.md"
 
-    # Write to vault
+    # Write to vault — apply path traversal guard
     folder = body.target_folder or "OCR"
-    full_dir = os.path.join(body.vault_path, folder)
+    full_dir = os.path.normpath(os.path.join(body.vault_path, folder))
+    norm_vault = os.path.normpath(body.vault_path)
+    if not full_dir.startswith(norm_vault):
+        raise HTTPException(status_code=403, detail="Path traversal denied")
     os.makedirs(full_dir, exist_ok=True)
-    full_path = os.path.join(full_dir, filename)
+
+    safe_filename = os.path.basename(filename)
+    full_path = os.path.normpath(os.path.join(full_dir, safe_filename))
+    if not full_path.startswith(norm_vault):
+        raise HTTPException(status_code=403, detail="Path traversal denied")
 
     with open(full_path, "w", encoding="utf-8") as f:
         f.write(markdown)

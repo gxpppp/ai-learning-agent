@@ -17,8 +17,11 @@ export async function ragQuery(
 ): Promise<string> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
+  const onExternalAbort = () => controller.abort();
+
   if (signal) {
-    signal.addEventListener("abort", () => controller.abort());
+    signal.addEventListener("abort", onExternalAbort);
   }
 
   let fullText = "";
@@ -93,5 +96,8 @@ export async function ragQuery(
     throw err;
   } finally {
     clearTimeout(timeoutId);
+    if (signal) {
+      signal.removeEventListener("abort", onExternalAbort);
+    }
   }
 }

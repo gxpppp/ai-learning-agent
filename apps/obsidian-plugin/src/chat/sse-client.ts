@@ -33,8 +33,10 @@ export async function streamChat(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  const onExternalAbort = () => controller.abort();
+
   if (options.signal) {
-    options.signal.addEventListener("abort", () => controller.abort());
+    options.signal.addEventListener("abort", onExternalAbort);
   }
 
   let fullText = "";
@@ -123,7 +125,7 @@ export async function streamChat(
   } finally {
     clearTimeout(timeoutId);
     if (options.signal) {
-      options.signal.removeEventListener("abort", () => controller.abort());
+      options.signal.removeEventListener("abort", onExternalAbort);
     }
   }
 }

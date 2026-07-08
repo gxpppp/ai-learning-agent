@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException
 
 from app.models.vault import VaultIndexRequest, VaultIndexResponse, VaultStatusResponse
@@ -14,6 +16,7 @@ router = APIRouter(prefix="/api/vault", tags=["vault"])
 embedding_client: EmbeddingClient | None = None
 vector_store: VectorStore | None = None
 vault_path: str = ""
+_indexing_lock = asyncio.Lock()
 _indexing_status: str = "idle"
 
 
@@ -34,23 +37,26 @@ async def trigger_index(body: VaultIndexRequest) -> VaultIndexResponse:
     if not vpath:
         raise HTTPException(status_code=400, detail="Vault path is required")
 
-    _indexing_status = "indexing"
-    try:
-        result = index_vault(vpath, embedding_client, vector_store, body.force_reindex)
-        _indexing_status = "idle"
-        total = result.get("total_files", 0) or 1
-        minutes = round((result.get("indexed_files", 0) / total) * 0.5, 1)
-        return VaultIndexResponse(
-            status="idle",
-            total_files=result["total_files"],
-            indexed_files=result["indexed_files"],
-            skipped_files=result["skipped_files"],
-            total_chunks=result["total_chunks"],
-            estimated_minutes=minutes,
-        )
-    except Exception as exc:
-        _indexing_status = "error"
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    async with _indexing_lock:
+        _indexing_status = "indexing"
+        try:
+            result = await asyncio.to_thread(
+                index_vault, vpath, embedding_client, vector_store, body.force_reindex
+            )
+            _indexing_status = "idle"
+            total = result.get("total_files", 0) or 1
+            minutes = round((result.get("indexed_files", 0) / total) * 0.5, 1)
+            return VaultIndexResponse(
+                status="idle",
+                total_files=result["total_files"],
+                indexed_files=result["indexed_files"],
+                skipped_files=result["skipped_files"],
+                total_chunks=result["total_chunks"],
+                estimated_minutes=minutes,
+            )
+        except Exception as exc:
+            _indexing_status = "error"
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/status", response_model=VaultStatusResponse)

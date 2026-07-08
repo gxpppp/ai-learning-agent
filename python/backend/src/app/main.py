@@ -59,10 +59,12 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
         if AUTO_INDEX:
             from app.services.file_watcher import FileWatcher
             from app.services.indexer import index_note, remove_note
+            from app.services.wordcloud_service import update_word_db
 
             def on_vault_change(action: str, rel_path: str) -> None:
                 if action == "delete":
                     remove_note(rel_path, OBSIDIAN_VAULT_PATH, vector_store)
+                    update_word_db(OBSIDIAN_VAULT_PATH, rel_path, "delete")
                 else:
                     index_note(
                         os.path.join(OBSIDIAN_VAULT_PATH, rel_path),
@@ -70,6 +72,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
                         embedding_client,
                         vector_store,
                     )
+                    update_word_db(OBSIDIAN_VAULT_PATH, rel_path, "add")
 
             file_watcher = FileWatcher(OBSIDIAN_VAULT_PATH, on_vault_change)
             file_watcher.start()
