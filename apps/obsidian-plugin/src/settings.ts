@@ -132,6 +132,26 @@ export class AISettingsTab extends PluginSettingTab {
       }),
     );
 
+    // ─── Active Provider ───
+    const providerIds = (this.plugin.settings.providers || []).map((p) => p.id);
+    const providerNames = (this.plugin.settings.providers || []).map((p) => p.name);
+    if (providerIds.length > 0) {
+      containerEl.createEl("h3", { text: "Active Provider" });
+      new Setting(containerEl)
+        .setName("Active provider")
+        .setDesc("Which provider's API key is used for all requests. Change this if you have multiple providers.")
+        .addDropdown((dd) => {
+          for (let i = 0; i < providerIds.length; i++) {
+            dd.addOption(providerIds[i], providerNames[i] || providerIds[i]);
+          }
+          dd.setValue(this.plugin.settings.activeProviderId || providerIds[0] || "deepseek");
+          dd.onChange(async (v) => {
+            this.plugin.settings.activeProviderId = v;
+            await this.plugin.saveSettings();
+          });
+        });
+    }
+
     // ─── Model Assignment ───
     containerEl.createEl("h3", { text: "Model Assignment" });
     const allModels = (this.plugin.settings.providers || []).flatMap((p) => p.models || []);
