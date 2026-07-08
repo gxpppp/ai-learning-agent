@@ -183,12 +183,17 @@ export default class AILearningAgentPlugin extends Plugin {
   }
 
   async loadSettings() {
-    const data = await this.loadData();
+    const rawData = await this.loadData();
+
+    // Strip legacy llm field permanently — never let it overwrite providers
+    const data = { ...rawData };
+    delete (data as Record<string, unknown>).llm;
+
     this.settings = { ...DEFAULT_CONFIG, ...data };
 
-    // Migrate old single-provider config to new multi-provider format
-    const old = data as { llm?: { baseUrl: string; apiKey: string; model: string } };
-    if (old?.llm) {
+    // One-time migration: only if providers array is empty
+    const old = rawData as { llm?: { baseUrl: string; apiKey: string; model: string } };
+    if (old?.llm && (!data.providers || (data.providers as Array<unknown>).length === 0)) {
       this.settings.providers = [
         {
           id: "deepseek",
