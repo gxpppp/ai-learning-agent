@@ -39,3 +39,8 @@ Thumbs.db
 
 # OpenHarness reference
 .ohmo/
+
+# Debug artifacts
+_debug_ocr.py
+*.jpg
+*.png
