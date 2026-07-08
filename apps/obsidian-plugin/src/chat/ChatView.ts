@@ -173,7 +173,9 @@ export class ChatView extends ItemView {
             sources = srcs;
           },
           onError: (msg: string) => {
-            new Notice(`RAG error: ${msg}`);
+            if (!msg.includes("503")) {
+              new Notice(`RAG error: ${msg}`);
+            }
           },
           onDone: () => {},
         },
