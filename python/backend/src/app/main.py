@@ -18,6 +18,8 @@ from app.config import (
     VERSION,
 )
 from app.routes.agent import router as agent_router
+from app.routes.upload import router as upload_router
+from app.routes.feedback import router as feedback_router
 from app.routes.chat import router as chat_router
 from app.routes.health import router as health_router
 from app.routes.notes import router as notes_router
@@ -120,6 +122,8 @@ app.include_router(vault_router)
 app.include_router(wordcloud_router)
 app.include_router(models_router)
 app.include_router(agent_router)
+app.include_router(upload_router)
+app.include_router(feedback_router)
 
 
 @app.get("/")

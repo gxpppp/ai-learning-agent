@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "test_cases": [
+    {
+      "id": "qa_001",
+      "input": "帮我搜索关于 Rust 所有权的笔记",
+      "expected_tools": ["search_notes"],
+      "expected_output_contains": ["所有权", "ownership"],
+      "min_score": 5.0
+    },
+    {
+      "id": "qa_002",
+      "input": "列一下我的主目录里有什么",
+      "expected_tools": ["list_folder"],
+      "expected_output_contains": ["folder", "file"],
+      "min_score": 5.0
+    },
+    {
+      "id": "qa_003",
+      "input": "创建一个 Notes 文件夹，在里面新建一篇标题为 Test 的笔记",
+      "expected_tools": ["create_folder", "create_note"],
+      "expected_output_contains": ["created", "Notes"],
+      "min_score": 5.0
+    },
+    {
+      "id": "qa_004",
+      "input": "看看我的 vault 索引状态怎么样",
+      "expected_tools": ["get_vault_status"],
+      "expected_output_contains": [],
+      "min_score": 4.0
+    },
+    {
+      "id": "qa_005",
+      "input": "帮我给这篇笔记推荐几个标签: Rust\\basics.md",
+      "expected_tools": ["suggest_tags"],
+      "expected_output_contains": ["tags"],
+      "min_score": 4.0
+    },
+    {
+      "id": "qa_006",
+      "input": "请帮我整理一下我的笔记，告诉我你的观察",
+      "expected_tools": ["list_folder", "search_notes"],
+      "expected_output_contains": [],
+      "min_score": 3.0
+    },
+    {
+      "id": "qa_007",
+      "input": "读一下 Rust\\basics.md 并告诉我大概内容",
+      "expected_tools": ["read_note"],
+      "expected_output_contains": [],
+      "min_score": 4.0
+    },
+    {
+      "id": "qa_008",
+      "input": "我有篇笔记可能重复了，帮我看看",
+      "expected_tools": ["list_folder", "search_notes"],
+      "expected_output_contains": [],
+      "min_score": 3.0
+    },
+    {
+      "id": "qa_009",
+      "input": "给 Rust 目录下的所有笔记打上合适的标签",
+      "expected_tools": ["list_folder", "suggest_tags"],
+      "expected_output_contains": ["tags", "tag"],
+      "min_score": 4.0
+    },
+    {
+      "id": "qa_010",
+      "input": "你可以做什么？你能操作我的 Obsidian 吗？",
+      "expected_tools": [],
+      "expected_output_contains": ["工具", "tool", "create", "search"],
+      "min_score": 4.0
+    }
+  ]
+}

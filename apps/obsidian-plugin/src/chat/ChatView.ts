@@ -5,6 +5,8 @@ import { type App, ItemView, Notice, type WorkspaceLeaf } from "obsidian";
 import type AILearningAgentPlugin from "../main";
 import { MessageRenderer } from "./MessageRenderer";
 import { ToolCallRenderer } from "./ToolCallRenderer";
+import { UploadZone } from "./UploadZone";
+import { FeedbackBar } from "./FeedbackBar";
 
 export const CHAT_VIEW_TYPE = "ai-learning-chat";
 
@@ -22,6 +24,7 @@ export class ChatView extends ItemView {
   private messages: ChatMessage[] = [];
   private messagesEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
+  private uploadZone!: UploadZone;
   private sendBtn!: HTMLElement;
   private stopBtn!: HTMLElement;
   private abortController: AbortController | null = null;
@@ -63,6 +66,7 @@ export class ChatView extends ItemView {
     }
 
     this.buildMessageArea(container);
+    this.buildUploadZone(container);
     this.buildInputBar(container);
     await this.loadLastSession();
   }
@@ -78,6 +82,10 @@ export class ChatView extends ItemView {
       const { scrollTop, scrollHeight, clientHeight } = this.messagesEl;
       this.userScrolledUp = scrollHeight - scrollTop - clientHeight > this.SCROLL_THRESHOLD;
     });
+  }
+
+  private buildUploadZone(container: HTMLElement): void {
+    this.uploadZone = new UploadZone(container, this.plugin.settings.server.port);
   }
 
   private buildInputBar(container: HTMLElement): void {
@@ -111,7 +119,13 @@ export class ChatView extends ItemView {
   }
 
   async sendMessage(): Promise<void> {
-    const content = this.inputEl.value.trim();
+    let content = this.inputEl.value.trim();
+    const paths = this.uploadZone.getUploadedPaths();
+    if (paths.length > 0) {
+      const fileHints = paths.map((p) => `[File: ${p}]`).join("\n");
+      content = content ? `${fileHints}\n${content}` : fileHints;
+      this.uploadZone.clear();
+    }
     if (!content || this.isStreaming) return;
     this.inputEl.value = "";
     this.inputEl.style.height = "auto";
@@ -135,6 +149,7 @@ export class ChatView extends ItemView {
       const responseText = await this.agentStream(content, port, toolRenderer);
       await this.renderer.finishStreaming();
       this.addMessage("assistant", responseText);
+      new FeedbackBar(assistantMsgEl, port, this.currentChatFile || "session");
       await this.saveSession();
     } catch (err: unknown) {
       await this.renderer.finishStreaming();

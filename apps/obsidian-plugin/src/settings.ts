@@ -142,7 +142,9 @@ export class AISettingsTab extends PluginSettingTab {
         .setDesc("Which provider's API key is used for all requests. Change this if you have multiple providers.")
         .addDropdown((dd) => {
           for (let i = 0; i < providerIds.length; i++) {
-            dd.addOption(providerIds[i], providerNames[i] || providerIds[i]);
+            const pid = providerIds[i] || "";
+            const pname = providerNames[i] || pid;
+            dd.addOption(pid, pname);
           }
           dd.setValue(this.plugin.settings.activeProviderId || providerIds[0] || "deepseek");
           dd.onChange(async (v) => {
