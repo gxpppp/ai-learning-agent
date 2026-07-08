@@ -187,6 +187,11 @@ export default class AILearningAgentPlugin extends Plugin {
     this.settings = { ...DEFAULT_CONFIG, ...data };
   }
 
+  getVaultBasePath(): string {
+    // @ts-expect-error basePath is available on the vault adapter in desktop Obsidian
+    return this.app.vault.adapter.basePath ?? "";
+  }
+
   async saveSettings() {
     await this.saveData(this.settings);
   }
@@ -196,7 +201,7 @@ export default class AILearningAgentPlugin extends Plugin {
       new Notice("AI backend is already running");
       return;
     }
-    this.sidecar = new SidecarManager(this.settings);
+    this.sidecar = new SidecarManager(this.settings, this.getVaultBasePath());
     try {
       await this.sidecar.start();
       new Notice("AI backend started");

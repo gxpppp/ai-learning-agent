@@ -6,9 +6,11 @@ import type { IAppConfig } from "@ai-tutor/shared-types";
 export class SidecarManager {
   private process: ChildProcess | null = null;
   private config: IAppConfig;
+  private vaultPath: string;
 
-  constructor(config: IAppConfig) {
+  constructor(config: IAppConfig, vaultPath: string) {
     this.config = config;
+    this.vaultPath = vaultPath;
   }
 
   async start(): Promise<void> {
@@ -142,13 +144,7 @@ export class SidecarManager {
   }
 
   private getProjectRoot(): string {
-    const vaultPath = this.config.vaultPath;
-    if (vaultPath) {
-      return path.join(vaultPath, ".obsidian", "plugins", "ai-learning-agent", "backend");
-    }
-    // Fallback for dev: try __dirname
-    const base = typeof __dirname !== "undefined" && __dirname ? __dirname : ".";
-    return path.resolve(base, "backend");
+    return path.join(this.vaultPath, ".obsidian", "plugins", "ai-learning-agent", "backend");
   }
 
   private getSourceDir(): string {
