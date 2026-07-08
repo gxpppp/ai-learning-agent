@@ -142,6 +142,11 @@ export class SidecarManager {
   }
 
   private getProjectRoot(): string {
+    const vaultPath = this.config.vaultPath;
+    if (vaultPath) {
+      return path.join(vaultPath, ".obsidian", "plugins", "ai-learning-agent", "backend");
+    }
+    // Fallback for dev: try __dirname
     const base = typeof __dirname !== "undefined" && __dirname ? __dirname : ".";
     return path.resolve(base, "backend");
   }

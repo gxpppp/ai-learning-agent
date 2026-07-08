@@ -18,7 +18,19 @@ Write-Host ""
 
 # 1. Build Obsidian plugin
 Write-Host "[1/4] Building Obsidian plugin..." -ForegroundColor Yellow
-pnpm run build
+$pnpm = Get-Command pnpm -ErrorAction SilentlyContinue
+if (-not $pnpm) {
+    $npmGlobal = & npm root -g
+    $pnpmPath = Join-Path (Split-Path $npmGlobal -Parent) "pnpm.cmd"
+    if (Test-Path $pnpmPath) {
+        $pnpm = $pnpmPath
+    } else {
+        Write-Host "pnpm not found. Installing..." -ForegroundColor Yellow
+        npm install -g pnpm
+        $pnpm = "pnpm"
+    }
+}
+& $pnpm run build
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed. Check the errors above." -ForegroundColor Red
     exit 1
