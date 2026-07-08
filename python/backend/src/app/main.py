@@ -11,6 +11,7 @@ from app.config import VERSION
 from app.routes.chat import router as chat_router
 from app.routes.health import router as health_router
 from app.routes.notes import router as notes_router
+from app.routes.ocr import router as ocr_router
 
 
 @asynccontextmanager
@@ -37,6 +38,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(chat_router)
 app.include_router(notes_router)
+app.include_router(ocr_router)
 
 
 @app.get("/")

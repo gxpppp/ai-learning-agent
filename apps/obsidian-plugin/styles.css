@@ -162,3 +162,46 @@
   color: var(--text-on-accent);
   border-color: var(--background-modifier-error);
 }
+
+/* ─── OCR Panel ──────────────────────────────────────────── */
+.ai-ocr-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+  background: var(--background-primary);
+}
+
+.ai-ocr-placeholder {
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.ai-ocr-result {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+}
+
+.ai-ocr-result h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.ai-ocr-content {
+  max-height: 400px;
+  overflow-y: auto;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 8px;
+  background: var(--background-primary);
+  border-radius: 4px;
+}

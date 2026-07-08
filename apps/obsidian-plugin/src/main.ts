@@ -2,6 +2,7 @@ import type { IAppConfig, ILLMConfig } from "@ai-tutor/shared-types";
 import { DEFAULT_CONFIG } from "@ai-tutor/shared-types";
 import { Notice, Plugin } from "obsidian";
 import { CHAT_VIEW_TYPE, ChatView } from "./chat/ChatView";
+import { OCR_VIEW_TYPE, OcrView } from "./ocr/OcrView";
 import { AISettingsTab } from "./settings";
 import { SidecarManager } from "./sidecar";
 
@@ -15,9 +16,11 @@ export default class AILearningAgentPlugin extends Plugin {
     this.addSettingTab(new AISettingsTab(this.app, this));
 
     this.registerView(CHAT_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
+    this.registerView(OCR_VIEW_TYPE, (leaf) => new OcrView(leaf, this));
 
     this.addRibbonIcon("message-square", "AI Tutor Chat", () => this.activateChatView());
 
+    // Chat commands
     this.addCommand({
       id: "open-ai-chat",
       name: "Open AI chat panel",
@@ -37,6 +40,28 @@ export default class AILearningAgentPlugin extends Plugin {
       },
     });
 
+    // OCR commands
+    this.addCommand({
+      id: "ocr-current-file",
+      name: "OCR: Scan current document",
+      callback: async () => {
+        const leaf = this.app.workspace.getLeavesOfType(OCR_VIEW_TYPE)[0];
+        const view = leaf?.view;
+        if (view instanceof OcrView) {
+          await view.ocrCurrentFile();
+        } else {
+          new Notice("Open the OCR panel first (AI Tutor: Open OCR panel)");
+        }
+      },
+    });
+
+    this.addCommand({
+      id: "open-ocr-panel",
+      name: "Open OCR panel",
+      callback: () => this.activateOcrView(),
+    });
+
+    // Backend management
     this.addCommand({
       id: "start-ai-backend",
       name: "Start AI backend",
@@ -54,6 +79,7 @@ export default class AILearningAgentPlugin extends Plugin {
 
   async onunload() {
     this.app.workspace.detachLeavesOfType(CHAT_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(OCR_VIEW_TYPE);
     await this.stopSidecar();
   }
 
@@ -64,6 +90,19 @@ export default class AILearningAgentPlugin extends Plugin {
       const rightLeaf = workspace.getRightLeaf(false);
       if (rightLeaf) {
         await rightLeaf.setViewState({ type: CHAT_VIEW_TYPE, active: true });
+      }
+    } else {
+      workspace.revealLeaf(leaf);
+    }
+  }
+
+  async activateOcrView() {
+    const { workspace } = this.app;
+    const leaf = workspace.getLeavesOfType(OCR_VIEW_TYPE)[0];
+    if (!leaf) {
+      const rightLeaf = workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        await rightLeaf.setViewState({ type: OCR_VIEW_TYPE, active: true });
       }
     } else {
       workspace.revealLeaf(leaf);
