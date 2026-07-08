@@ -68,6 +68,7 @@ export class SidecarManager {
       TOOL_PERMISSIONS: this.config.toolPermissions || "readonly",
       REASONING_ENABLED: String(this.config.thinkingEnabled || false),
       REASONING_EFFORT: this.config.reasoningEffort || "high",
+      EMBEDDING_MODEL: path.join(this.getProjectRoot(), "models", "bge-m3"),
       SERVER_PORT: String(port),
       SERVER_HOST: host,
       OBSIDIAN_VAULT_PATH: this.config.vaultPath,
