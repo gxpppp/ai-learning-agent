@@ -1,8 +1,4 @@
-"""Agent chat endpoint — LLM produces JSON action plan, tools execute locally.
-
-No function calling API required. LLM returns a JSON plan that the
-Python backend parses and executes locally. Works with any LLM.
-"""
+"""Agent chat endpoint — routes simple tasks to JSON plan parser, complex to Gateway."""
 
 from __future__ import annotations
 
@@ -19,7 +15,16 @@ from pydantic import BaseModel
 
 import app.llm.manager as _llm_mgr
 from app.config import ACTIVE_CHAT_MODEL, ACTIVE_PROVIDER_ID, OBSIDIAN_VAULT_PATH, TOOL_PERMISSIONS
-from app.core.tool_registry import execute_tool, get_tools
+from app.core.dispatcher import TaskComplexity, classify
+from app.core.event_bus import (
+    done_event,
+    error_event,
+    format_sse,
+    token_event,
+    tool_call_event,
+    tool_result_event,
+)
+from app.core.tool_registry import execute_tool
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +66,32 @@ async def _agent_loop(
     request: Request,
 ) -> AsyncGenerator[str, None]:
     if not _llm_mgr.llm_manager:
-        yield _sse("error", {"message": "LLM Manager not initialized"})
+        yield error_event("LLM Manager not initialized")
         return
+
+    # ── Gateway routing ──
+    complexity = classify(user_message)
+
+    if complexity == TaskComplexity.SEARCH:
+        from app.gateway.router import route
+        async for event in route(user_message, OBSIDIAN_VAULT_PATH, conversation):
+            if await request.is_disconnected():
+                return
+            yield event
+        yield done_event()
+        return
+
+    if complexity == TaskComplexity.COMPLEX:
+        from app.gateway.router import route
+        async for event in route(user_message, OBSIDIAN_VAULT_PATH, conversation):
+            if await request.is_disconnected():
+                return
+            yield event
+        # Fall through to simple LLM handling for now
+        yield token_event("\n---\nHandling step by step:\n")
+
+    # ── Simple path: JSON action plan ──
+    from app.core.tool_registry import get_tools
 
     tools = get_tools(TOOL_PERMISSIONS)
     tools_list = "\n".join(
@@ -93,60 +122,49 @@ async def _agent_loop(
         )  # type: ignore[call-overload]
     except Exception as exc:
         logger.exception("Agent LLM call failed")
-        yield _sse("error", {"message": str(exc)})
+        yield error_event(str(exc))
+        return
+
+    if await request.is_disconnected():
         return
 
     choice = response.choices[0]  # type: ignore[union-attr]
     msg = choice.message
 
     if getattr(msg, "reasoning_content", None):
-        yield _sse("thinking", {"content": msg.reasoning_content})  # type: ignore[union-attr]
+        yield format_sse("thinking", {"content": msg.reasoning_content})  # type: ignore[union-attr]
 
     full_text = msg.content or ""
 
-    # Parse JSON action plan from the response
     actions = _parse_actions(full_text)
 
     if actions:
-        # Remove the JSON block from visible text, leave just the summary
         visible_text = _strip_json_blocks(full_text).strip()
         if visible_text:
-            yield _sse("token", {"content": visible_text})
-            yield _sse("token", {"content": "\n\n"})
+            yield token_event(visible_text)
+            yield token_event("\n\n")
 
-        # Execute each action locally
         for i, action in enumerate(actions):
             tool_name = action.get("tool", "")
             tool_args = action.get("args", {})
 
-            yield _sse("tool_call", {
-                "id": f"local_{i}",
-                "name": tool_name,
-                "args": tool_args,
-            })
+            yield tool_call_event(f"local_{i}", tool_name, tool_args)
 
             t0 = asyncio.get_event_loop().time()
             result = await execute_tool(tool_name, tool_args, OBSIDIAN_VAULT_PATH)
             elapsed = round((asyncio.get_event_loop().time() - t0) * 1000)
 
-            yield _sse("tool_result", {
-                "id": f"local_{i}",
-                "name": tool_name,
-                "content": result,
-                "elapsed_ms": elapsed,
-            })
+            yield tool_result_event(f"local_{i}", tool_name, result, elapsed)
 
-        yield _sse("token", {"content": f"\nDone — {len(actions)} action(s) completed."})
+        yield token_event(f"\nDone \u2014 {len(actions)} action(s) completed.")
     else:
-        # No JSON plan — just stream the text response as-is
-        yield _sse("token", {"content": full_text})
+        yield token_event(full_text)
 
-    yield "data: [DONE]\n\n"
+    yield done_event()
 
 
-def _parse_actions(text: str) -> list[dict]:
+def _parse_actions(text: str) -> list[dict[str, Any]]:
     """Extract JSON action plan from LLM response."""
-    # Try ```json ... ``` blocks
     matches = re.findall(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
     for match in matches:
         try:
@@ -162,11 +180,6 @@ def _parse_actions(text: str) -> list[dict]:
 def _strip_json_blocks(text: str) -> str:
     """Remove JSON code fences from text for display."""
     return re.sub(r"```(?:json)?\s*\n?.*?\n?```", "", text, flags=re.DOTALL)
-
-
-def _sse(event: str, data: dict) -> str:
-    payload = json.dumps(data, ensure_ascii=False)
-    return f"event: {event}\ndata: {payload}\n\n"
 
 
 class AgentChatRequest(BaseModel):

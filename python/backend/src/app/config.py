@@ -33,6 +33,9 @@ OCR_SERVER_URL = os.getenv("OCR_SERVER_URL", "http://127.0.0.1:8080/v1")
 OCR_MODEL = os.getenv("OCR_MODEL", "PaddleOCR-VL-0.9B")
 OCR_ENABLED = os.getenv("OCR_ENABLED", "false").lower() == "true"
 
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+WEB_SEARCH_ENABLED = os.getenv("WEB_SEARCH_ENABLED", "false").lower() == "true"
+
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "512"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "64"))
