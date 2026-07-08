@@ -196,5 +196,20 @@ export class AISettingsTab extends PluginSettingTab {
             }
           }),
       );
+
+    // Save & Restart button
+    containerEl.createEl("div", { cls: "ai-settings-save-bar" }, (bar) => {
+      const btn = bar.createEl("button", { cls: "mod-cta", text: "Save & Restart Backend" });
+      btn.addEventListener("click", async () => {
+        await this.plugin.saveSettings();
+        await this.plugin.stopSidecar();
+        try {
+          await this.plugin.startSidecar();
+          new Notice("Settings saved and backend restarted.");
+        } catch (e) {
+          new Notice(`Restart failed: ${e}`);
+        }
+      });
+    });
   }
 }

@@ -17,9 +17,9 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.config import ACTIVE_AGENT_MODEL, ACTIVE_PROVIDER_ID, OBSIDIAN_VAULT_PATH, TOOL_PERMISSIONS
-from app.models.chat import ChatMessage
 import app.services.llm_manager as _llm_mgr
 from app.services.tool_registry import execute_tool, get_tools
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,8 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {payload}\n\n"
 
 
-class AgentChatRequest(ChatMessage):
+class AgentChatRequest(BaseModel):
+    content: str
     conversation: list[dict[str, Any]] = []
 
 
