@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 
-from app.services.llm_client import LLMClient
+from app.llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
 

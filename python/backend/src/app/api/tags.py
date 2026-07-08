@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from app.infra.embedding import EmbeddingClient
+from app.infra.tag_engine import recommend_links as _recommend_links
+from app.infra.tag_engine import suggest_tags as _suggest_tags
+from app.infra.vector_store import VectorStore
 from app.models.tag import (
     LinkRecommendRequest,
     LinkRecommendResponse,
     TagSuggestRequest,
     TagSuggestResponse,
 )
-from app.services.embedding import EmbeddingClient
-from app.services.tag_service import recommend_links as _recommend_links
-from app.services.tag_service import suggest_tags as _suggest_tags
-from app.services.vector_store import VectorStore
 
 router = APIRouter(prefix="/api", tags=["tags"])
 

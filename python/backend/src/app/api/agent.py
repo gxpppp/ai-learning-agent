@@ -17,9 +17,9 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+import app.llm.manager as _llm_mgr
 from app.config import ACTIVE_CHAT_MODEL, ACTIVE_PROVIDER_ID, OBSIDIAN_VAULT_PATH, TOOL_PERMISSIONS
-import app.services.llm_manager as _llm_mgr
-from app.services.tool_registry import execute_tool, get_tools
+from app.core.tool_registry import execute_tool, get_tools
 
 logger = logging.getLogger(__name__)
 

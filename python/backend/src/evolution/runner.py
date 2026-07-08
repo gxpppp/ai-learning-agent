@@ -67,7 +67,7 @@ async def run_evolution_cycle() -> dict[str, Any]:
     
     CLI usage: python -m evolution.runner
     """
-    from app.services.llm_manager import llm_manager
+    from app.llm.manager import llm_manager
     from evolution.evaluator import evaluate_response, load_test_suite
     from evolution.mutator import build_mutation_prompt, generate_variants
 

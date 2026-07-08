@@ -8,8 +8,8 @@ from typing import Any
 
 import frontmatter
 
-from app.services.embedding import EmbeddingClient
-from app.services.vector_store import VectorStore
+from app.infra.embedding import EmbeddingClient
+from app.infra.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 

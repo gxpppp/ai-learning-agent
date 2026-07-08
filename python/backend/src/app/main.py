@@ -9,34 +9,33 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-logging.basicConfig(level=logging.INFO, format="[%(name)s] %(message)s")
-logger = logging.getLogger("server")
-
+from app.api.agent import router as agent_router
+from app.api.chat import router as chat_router
+from app.api.feedback import router as feedback_router
+from app.api.health import router as health_router
+from app.api.models import router as models_router
+from app.api.notes import router as notes_router
+from app.api.ocr import router as ocr_router
+from app.api.rag import init_rag
+from app.api.rag import router as rag_router
+from app.api.tags import init_tags
+from app.api.tags import router as tags_router
+from app.api.upload import router as upload_router
+from app.api.vault import init_vault
+from app.api.vault import router as vault_router
+from app.api.wordcloud import init_wordcloud
+from app.api.wordcloud import router as wordcloud_router
 from app.config import (
     AUTO_INDEX,
     EMBEDDING_MODEL,
     OBSIDIAN_VAULT_PATH,
     PROVIDERS_JSON,
     RAG_ENABLED,
-    TOOL_PERMISSIONS,
     VERSION,
 )
-from app.routes.agent import router as agent_router
-from app.routes.upload import router as upload_router
-from app.routes.feedback import router as feedback_router
-from app.routes.chat import router as chat_router
-from app.routes.health import router as health_router
-from app.routes.notes import router as notes_router
-from app.routes.ocr import router as ocr_router
-from app.routes.rag import init_rag
-from app.routes.rag import router as rag_router
-from app.routes.tags import init_tags
-from app.routes.tags import router as tags_router
-from app.routes.vault import init_vault
-from app.routes.vault import router as vault_router
-from app.routes.wordcloud import init_wordcloud
-from app.routes.wordcloud import router as wordcloud_router
-from app.routes.models import router as models_router
+
+logging.basicConfig(level=logging.INFO, format="[%(name)s] %(message)s")
+logger = logging.getLogger("server")
 
 embedding_client = None
 vector_store = None
@@ -50,21 +49,21 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"[server] AI Learning Backend v{VERSION} starting...")
 
     # Initialize LLM Manager
-    logger.info(f"[server] Initializing LLM Manager...")
-    from app.services.llm_manager import LLMManager, llm_manager as _llm_global
+    logger.info("[server] Initializing LLM Manager...")
+    from app.llm.manager import LLMManager
     _llm = LLMManager(PROVIDERS_JSON)
-    import app.services.llm_manager as _lmm
+    import app.llm.manager as _lmm
     _lmm.llm_manager = _llm
     logger.info(f"[server] LLM Manager ready ({len(_llm.providers)} providers).")
 
     if RAG_ENABLED and OBSIDIAN_VAULT_PATH:
         logger.info(f"[server] Initializing embedding model: {EMBEDDING_MODEL}...")
-        from app.services.embedding import EmbeddingClient
+        from app.infra.embedding import EmbeddingClient
         embedding_client = EmbeddingClient(EMBEDDING_MODEL)
         logger.info(f"[server] Embedding dim={embedding_client.dimension} loaded.")
 
         logger.info(f"[server] Initializing vector store at {OBSIDIAN_VAULT_PATH}/.ai-tutor/lancedb")
-        from app.services.vector_store import VectorStore
+        from app.infra.vector_store import VectorStore
         vector_store = VectorStore(OBSIDIAN_VAULT_PATH)
         logger.info(f"[server] Vector store ready ({vector_store.count()} chunks).")
 
@@ -75,9 +74,9 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
         # Start file watcher
         if AUTO_INDEX:
-            from app.services.file_watcher import FileWatcher
-            from app.services.indexer import index_note, remove_note
-            from app.services.wordcloud_service import update_word_db
+            from app.infra.file_watcher import FileWatcher
+            from app.infra.indexer import index_note, remove_note
+            from app.infra.wordcloud import update_word_db
 
             def on_vault_change(action: str, rel_path: str) -> None:
                 if action == "delete":

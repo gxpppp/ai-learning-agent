@@ -27,14 +27,14 @@ async def client() -> AsyncClient:
 @pytest.mark.asyncio
 async def test_tool_path_traversal_blocked(vault_dir: str):
     """Tool execution should block path traversal."""
-    from app.services.tool_registry import _safe_path
+    from app.core.tool_registry import _safe_path
     with pytest.raises(ValueError):
         _safe_path(vault_dir, "../etc/passwd")
 
 
 @pytest.mark.asyncio
 async def test_tool_list_folder_empty(vault_dir: str):
-    from app.services.tool_registry import _list_folder
+    from app.core.tool_registry import _list_folder
     result = _list_folder({"path": ""}, vault_dir)
     data = json.loads(result)
     assert data["count"] == 0
@@ -42,7 +42,7 @@ async def test_tool_list_folder_empty(vault_dir: str):
 
 @pytest.mark.asyncio
 async def test_tool_create_folder(vault_dir: str):
-    from app.services.tool_registry import _create_folder
+    from app.core.tool_registry import _create_folder
     result = _create_folder({"path": "test-subdir"}, vault_dir)
     data = json.loads(result)
     assert data["created_folder"] == "test-subdir"
@@ -51,7 +51,7 @@ async def test_tool_create_folder(vault_dir: str):
 
 @pytest.mark.asyncio
 async def test_tool_create_and_read_note(vault_dir: str):
-    from app.services.tool_registry import _create_note, _read_note
+    from app.core.tool_registry import _create_note, _read_note
     _create_note({
         "folder": "",
         "filename": "test.md",
@@ -65,7 +65,7 @@ async def test_tool_create_and_read_note(vault_dir: str):
 
 @pytest.mark.asyncio
 async def test_tool_delete_note(vault_dir: str):
-    from app.services.tool_registry import _create_note, _delete_note
+    from app.core.tool_registry import _create_note, _delete_note
     _create_note({
         "folder": "",
         "filename": "to-delete.md",
@@ -79,7 +79,7 @@ async def test_tool_delete_note(vault_dir: str):
 
 @pytest.mark.asyncio
 async def test_tool_move_note(vault_dir: str):
-    from app.services.tool_registry import _create_note, _move_note, _read_note
+    from app.core.tool_registry import _create_note, _move_note, _read_note
     _create_note({
         "folder": "src",
         "filename": "move-me.md",
@@ -92,7 +92,7 @@ async def test_tool_move_note(vault_dir: str):
 
 @pytest.mark.asyncio
 async def test_tool_unknown(vault_dir: str):
-    from app.services.tool_registry import execute_tool
+    from app.core.tool_registry import execute_tool
     result = await execute_tool("nonexistent", {}, vault_dir)
     data = json.loads(result)
     assert "Unknown tool" in data["error"]
@@ -100,7 +100,7 @@ async def test_tool_unknown(vault_dir: str):
 
 @pytest.mark.asyncio
 async def test_tool_file_not_found(vault_dir: str):
-    from app.services.tool_registry import _read_note
+    from app.core.tool_registry import _read_note
     result = _read_note({"note_path": "nope.md"}, vault_dir)
     data = json.loads(result)
     assert data["error"] == "File not found"

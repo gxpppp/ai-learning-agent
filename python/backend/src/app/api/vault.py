@@ -6,10 +6,10 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException
 
+from app.infra.embedding import EmbeddingClient
+from app.infra.indexer import _load_index_state, index_vault
+from app.infra.vector_store import VectorStore
 from app.models.vault import VaultIndexRequest, VaultIndexResponse, VaultStatusResponse
-from app.services.embedding import EmbeddingClient
-from app.services.indexer import _load_index_state, index_vault
-from app.services.vector_store import VectorStore
 
 router = APIRouter(prefix="/api/vault", tags=["vault"])
 

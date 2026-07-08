@@ -273,8 +273,8 @@ def _safe_path(vault_path: str, rel_path: str) -> str:
 
 async def _search_notes(args: dict, vault_path: str) -> str:
     from app.config import EMBEDDING_MODEL
-    from app.services.embedding import EmbeddingClient
-    from app.services.vector_store import VectorStore
+    from app.infra.embedding import EmbeddingClient
+    from app.infra.vector_store import VectorStore
 
     store = VectorStore(vault_path)
     if store.count() == 0:
@@ -315,9 +315,9 @@ def _list_folder(args: dict, vault_path: str) -> str:
 
 def _suggest_tags(args: dict, vault_path: str) -> str:
     from app.config import EMBEDDING_MODEL
-    from app.services.embedding import EmbeddingClient
-    from app.services.tag_service import suggest_tags as _st
-    from app.services.vector_store import VectorStore
+    from app.infra.embedding import EmbeddingClient
+    from app.infra.tag_engine import suggest_tags as _st
+    from app.infra.vector_store import VectorStore
 
     store = VectorStore(vault_path)
     emb = EmbeddingClient(EMBEDDING_MODEL)
@@ -327,9 +327,9 @@ def _suggest_tags(args: dict, vault_path: str) -> str:
 
 def _recommend_links(args: dict, vault_path: str) -> str:
     from app.config import EMBEDDING_MODEL
-    from app.services.embedding import EmbeddingClient
-    from app.services.tag_service import recommend_links as _rl
-    from app.services.vector_store import VectorStore
+    from app.infra.embedding import EmbeddingClient
+    from app.infra.tag_engine import recommend_links as _rl
+    from app.infra.vector_store import VectorStore
 
     store = VectorStore(vault_path)
     emb = EmbeddingClient(EMBEDDING_MODEL)
@@ -409,7 +409,7 @@ async def _ocr_document(args: dict, vault_path: str) -> str:
     try:
         from app.config import OCR_ENABLED, OCR_MODEL, OCR_SERVER_URL
         if OCR_ENABLED:
-            from app.services.llm_client import LLMClient
+            from app.llm.client import LLMClient
             ocr = LLMClient(OCR_SERVER_URL, "not-needed", OCR_MODEL)
             with open(file_path, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode()
@@ -464,7 +464,7 @@ def _classify_note(args: dict, vault_path: str) -> str:
 
 
 async def _generate_summary(args: dict, vault_path: str) -> str:
-    import app.services.llm_manager as _lmm
+    import app.llm.manager as _lmm
     from app.config import ACTIVE_CHAT_MODEL, ACTIVE_PROVIDER_ID
 
     full = _safe_path(vault_path, args["note_path"])
@@ -494,8 +494,8 @@ async def _generate_summary(args: dict, vault_path: str) -> str:
 
 
 def _get_vault_status(vault_path: str) -> str:
-    from app.services.indexer import _load_index_state
-    from app.services.vector_store import VectorStore
+    from app.infra.indexer import _load_index_state
+    from app.infra.vector_store import VectorStore
 
     state = _load_index_state(vault_path)
     store = VectorStore(vault_path)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-import app.services.llm_manager as _llm_mgr
+import app.llm.manager as _llm_mgr
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 

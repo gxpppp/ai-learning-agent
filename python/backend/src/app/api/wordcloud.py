@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from app.infra.wordcloud import generate_wordcloud
 from app.models.wordcloud import WordCloudRequest, WordCloudResponse
-from app.services.wordcloud_service import generate_wordcloud
 
 router = APIRouter(prefix="/api/wordcloud", tags=["wordcloud"])
 

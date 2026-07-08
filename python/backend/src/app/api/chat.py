@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-import app.services.llm_manager as _llm_mgr
+import app.llm.manager as _llm_mgr
 from app.config import (
     ACTIVE_PROVIDER_ID,
     LLM_MODEL,

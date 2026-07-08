@@ -9,8 +9,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.config import CHUNK_OVERLAP, CHUNK_SIZE
-from app.services.embedding import EmbeddingClient
-from app.services.vector_store import VectorStore
+from app.infra.embedding import EmbeddingClient
+from app.infra.vector_store import VectorStore
 
 INDEX_STATE = "index_state.json"
 

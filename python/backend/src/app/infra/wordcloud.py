@@ -189,7 +189,7 @@ def generate_wordcloud(
 
 def build_initial_wordcloud(vault_path: str) -> dict[str, Any]:
     """Build initial word cloud by scanning all notes."""
-    from app.services.indexer import _find_markdown_files
+    from app.infra.indexer import _find_markdown_files
 
     files = _find_markdown_files(vault_path)
     db: dict[str, dict[str, float]] = {}
