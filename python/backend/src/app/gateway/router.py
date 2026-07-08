@@ -38,7 +38,7 @@ async def route(
 
     elif complexity == TaskComplexity.COMPLEX:
         yield agent_start_event("orchestrator", user_message[:80])
-        yield token_event("This is a complex task. Multi-agent orchestration will be available in Stage 3.\n\n")
+        yield token_event("Analyzing your request and planning the best approach...\n\n")
         yield token_event("For now, I'll handle this step by step:\n\n")
         # Fallback: treat as simple for now
         yield agent_end_event("orchestrator", "fallback-to-simple")

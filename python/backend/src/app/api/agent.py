@@ -82,13 +82,45 @@ async def _agent_loop(
         return
 
     if complexity == TaskComplexity.COMPLEX:
-        from app.gateway.router import route
-        async for event in route(user_message, OBSIDIAN_VAULT_PATH, conversation):
+        # Use OpenHarness-powered gateway coordinator
+        from app.gateway.coordinator import GatewayCoordinator
+        from app.gateway.router import route as gateway_route
+
+        # First, let the router set up context (agent_start etc.)
+        async for event in gateway_route(user_message, OBSIDIAN_VAULT_PATH, conversation):
             if await request.is_disconnected():
                 return
             yield event
-        # Fall through to simple LLM handling for now
-        yield token_event("\n---\nHandling step by step:\n")
+
+        # Then, use OpenHarness engine for the actual work
+        coordinator = GatewayCoordinator(
+            vault_path=OBSIDIAN_VAULT_PATH,
+            permission_mode=TOOL_PERMISSIONS,
+        )
+
+        # Build system prompt with tool list
+        from app.core.tool_registry import get_tools
+        tools = get_tools(TOOL_PERMISSIONS)
+        tools_list = "\n".join(
+            f"- **{t['function']['name']}**: {t['function']['description']}"
+            for t in tools
+        )
+        system_prompt = AGENT_PROMPT.format(
+            tools_list=tools_list,
+            vault_path=OBSIDIAN_VAULT_PATH,
+            permission_mode=TOOL_PERMISSIONS,
+        )
+
+        async for event in coordinator.execute_simple(
+            user_message=user_message,
+            system_prompt=system_prompt,
+            provider_id=ACTIVE_PROVIDER_ID,
+            model=ACTIVE_CHAT_MODEL,
+        ):
+            if await request.is_disconnected():
+                return
+            yield event
+        return
 
     # ── Simple path: JSON action plan ──
     from app.core.tool_registry import get_tools
