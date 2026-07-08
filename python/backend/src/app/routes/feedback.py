@@ -21,7 +21,9 @@ class FeedbackRequest(BaseModel):
 
 
 @router.post("")
-async def submit_feedback(body: FeedbackRequest) -> dict:
+async def submit_feedback(body: FeedbackRequest) -> dict[str, str]:
+    if not OBSIDIAN_VAULT_PATH:
+        return {"status": "error", "detail": "Vault path not configured"}
     evolution_dir = os.path.join(OBSIDIAN_VAULT_PATH, ".ai-tutor", "evolution")
     os.makedirs(evolution_dir, exist_ok=True)
 

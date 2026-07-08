@@ -63,7 +63,10 @@ def _log_history(line: str) -> None:
 
 
 async def run_evolution_cycle() -> dict[str, Any]:
-    """Run one full evolution cycle and return summary."""
+    """Run one full evolution cycle and return summary.
+    
+    CLI usage: python -m evolution.runner
+    """
     from app.services.llm_manager import llm_manager
     from evolution.evaluator import evaluate_response, load_test_suite
     from evolution.mutator import build_mutation_prompt, generate_variants
@@ -115,8 +118,10 @@ async def run_evolution_cycle() -> dict[str, Any]:
 
     current_score = scores.get("current", 5.0)
     if best_score > current_score * 1.05 and best_id:
-        _deploy_prompt(variants[0]["prompt"] if best_id == variants[0]["id"] else current)
-        _log_history(f"Deployed {best_id} (score {best_score}, +{round(best_score - current_score, 2)})")
+        best_variant = next((v for v in variants if v["id"] == best_id), None)
+        if best_variant:
+            _deploy_prompt(best_variant["prompt"])
+            _log_history(f"Deployed {best_id} (score {best_score}, +{round(best_score - current_score, 2)})")
         status = "deployed"
     else:
         _log_history(f"No deployment (best={best_score}, current={current_score})")
@@ -129,3 +134,9 @@ async def run_evolution_cycle() -> dict[str, Any]:
         "best_variant": best_id,
         "timestamp": datetime.now(UTC).isoformat(),
     }
+
+if __name__ == "__main__":
+    import asyncio
+    print("Running evolution cycle...")
+    result = asyncio.run(run_evolution_cycle())
+    print(json.dumps(result, indent=2, ensure_ascii=False))

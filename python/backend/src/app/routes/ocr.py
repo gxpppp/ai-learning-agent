@@ -30,13 +30,7 @@ def _get_ocr():
     """Lazy-load PaddleOCR engine."""
     global _ocr_engine
     if _ocr_engine is None:
-        import os, glob, platform
-        # PaddlePaddle needs CUDNN 9.9+; prefer pip-installed DLLs over system
-        if platform.system() == "Windows":
-            site_packages = os.path.dirname(os.path.dirname(__file__))
-            for cudnn_bin in glob.glob(os.path.join(site_packages, "..", ".venv", "Lib", "site-packages", "nvidia", "cudnn", "bin")):
-                os.add_dll_directory(os.path.abspath(cudnn_bin))
-                break
+        import os
         from paddleocr import PaddleOCR
         _ocr_engine = PaddleOCR(lang="ch", use_angle_cls=True)
         logger.info("PaddleOCR engine loaded")

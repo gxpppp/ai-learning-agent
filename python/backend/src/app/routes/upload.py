@@ -17,9 +17,11 @@ MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 
 
 @router.post("/")
-async def upload_file(file: UploadFile) -> dict:
+async def upload_file(file: UploadFile) -> dict[str, str | int]:
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
+    if not OBSIDIAN_VAULT_PATH:
+        raise HTTPException(status_code=400, detail="Vault path not configured")
 
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
