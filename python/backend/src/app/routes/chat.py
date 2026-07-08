@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -19,17 +21,17 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 async def _stream_chat(
-    messages: list[dict[str, str]],
+    messages: list[dict[str, Any]],
     model: str,
     temperature: float,
     max_tokens: int,
     request: Request,
-):
+) -> AsyncGenerator[str, None]:
     """Yield SSE-formatted strings for the chat completion stream."""
     try:
         stream = await client.async_client.chat.completions.create(
             model=model or LLM_MODEL,
-            messages=messages,
+            messages=messages,  # type: ignore[arg-type]
             temperature=temperature,
             max_tokens=max_tokens,
             stream=True,
@@ -37,7 +39,7 @@ async def _stream_chat(
 
         last_keepalive = asyncio.get_event_loop().time()
 
-        async for chunk in stream:
+        async for chunk in stream:  # type: ignore[union-attr]
             if await request.is_disconnected():
                 logger.info("Client disconnected; aborting stream.")
                 return
@@ -47,7 +49,7 @@ async def _stream_chat(
                 yield ": heartbeat\n\n"
                 last_keepalive = now
 
-            delta = chunk.choices[0].delta
+            delta = chunk.choices[0].delta  # type: ignore[union-attr]
             if delta.content:
                 payload = json.dumps({"content": delta.content}, ensure_ascii=False)
                 yield f"event: token\ndata: {payload}\n\n"
@@ -67,10 +69,12 @@ async def _stream_chat(
 
 
 @router.post("/stream")
-async def chat_stream(request: Request, body: ChatRequest):
+async def chat_stream(request: Request, body: ChatRequest) -> StreamingResponse:
     """Stream a chat completion via Server-Sent Events."""
     try:
-        messages = [{"role": m.role, "content": m.content} for m in body.messages]
+        messages: list[dict[str, Any]] = [
+            {"role": m.role, "content": m.content} for m in body.messages
+        ]
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Invalid messages: {exc}") from exc
 

@@ -1,5 +1,5 @@
 import esbuild from "esbuild";
-import process from "process";
+import process from "node:process";
 
 const prod = process.argv[2] === "production";
 

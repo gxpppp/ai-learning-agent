@@ -1,6 +1,7 @@
-import { Plugin, Notice } from "obsidian";
 import type { IAppConfig, ILLMConfig } from "@ai-tutor/shared-types";
 import { DEFAULT_CONFIG } from "@ai-tutor/shared-types";
+import { Notice, Plugin } from "obsidian";
+import { CHAT_VIEW_TYPE, ChatView } from "./chat/ChatView";
 import { AISettingsTab } from "./settings";
 import { SidecarManager } from "./sidecar";
 
@@ -13,11 +14,26 @@ export default class AILearningAgentPlugin extends Plugin {
 
     this.addSettingTab(new AISettingsTab(this.app, this));
 
+    this.registerView(CHAT_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
+
+    this.addRibbonIcon("message-square", "AI Tutor Chat", () => this.activateChatView());
+
     this.addCommand({
       id: "open-ai-chat",
       name: "Open AI chat panel",
-      callback: () => {
-        new Notice("AI Chat: coming in Phase 1");
+      hotkeys: [{ modifiers: ["Mod", "Shift"], key: "L" }],
+      callback: () => this.activateChatView(),
+    });
+
+    this.addCommand({
+      id: "new-chat-session",
+      name: "New AI chat session",
+      callback: async () => {
+        const leaf = this.app.workspace.getLeavesOfType(CHAT_VIEW_TYPE)[0];
+        if (leaf?.view instanceof ChatView) {
+          await leaf.view.newSession();
+          new Notice("New chat session started");
+        }
       },
     });
 
@@ -37,7 +53,21 @@ export default class AILearningAgentPlugin extends Plugin {
   }
 
   async onunload() {
+    this.app.workspace.detachLeavesOfType(CHAT_VIEW_TYPE);
     await this.stopSidecar();
+  }
+
+  async activateChatView() {
+    const { workspace } = this.app;
+    const leaf = workspace.getLeavesOfType(CHAT_VIEW_TYPE)[0];
+    if (!leaf) {
+      const rightLeaf = workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        await rightLeaf.setViewState({ type: CHAT_VIEW_TYPE, active: true });
+      }
+    } else {
+      workspace.revealLeaf(leaf);
+    }
   }
 
   async loadSettings() {

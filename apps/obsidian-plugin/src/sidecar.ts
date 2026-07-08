@@ -1,6 +1,6 @@
-import { spawn, execSync, type ChildProcess } from "child_process";
+import { type ChildProcess, execSync, spawn } from "node:child_process";
+import * as path from "node:path";
 import type { IAppConfig } from "@ai-tutor/shared-types";
-import * as path from "path";
 
 export class SidecarManager {
   private process: ChildProcess | null = null;
@@ -22,13 +22,21 @@ export class SidecarManager {
       OBSIDIAN_VAULT_PATH: this.config.vaultPath,
     };
 
-    const pythonCmd = process.platform === "win32" ? "python" : "python3";
+    const projectRoot = this.getProjectRoot();
+    const pythonExe =
+      process.platform === "win32"
+        ? path.join(projectRoot, ".venv", "Scripts", "python.exe")
+        : path.join(projectRoot, ".venv", "bin", "python");
 
-    const proc = spawn(pythonCmd, ["-m", "uvicorn", "app.main:app", "--host", host, "--port", String(port)], {
-      env,
-      cwd: this.getBackendPath(),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const proc = spawn(
+      pythonExe,
+      ["-m", "uvicorn", "app.main:app", "--host", host, "--port", String(port)],
+      {
+        env,
+        cwd: this.getSourceDir(),
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
     this.process = proc;
 
     proc.stdout?.on("data", (data: Buffer) => {
@@ -96,12 +104,16 @@ export class SidecarManager {
     throw new Error(`Backend did not become healthy within ${timeoutMs}ms`);
   }
 
-  private getBackendPath(): string {
+  private getProjectRoot(): string {
     try {
-      const base = (typeof __dirname !== "undefined" && __dirname) ? __dirname : ".";
-      return path.resolve(base, "..", "..", "..", "python", "backend", "src");
+      const base = typeof __dirname !== "undefined" && __dirname ? __dirname : ".";
+      return path.resolve(base, "..", "..", "..", "python", "backend");
     } catch {
-      return path.resolve("python", "backend", "src");
+      return path.resolve("python", "backend");
     }
+  }
+
+  private getSourceDir(): string {
+    return path.join(this.getProjectRoot(), "src");
   }
 }

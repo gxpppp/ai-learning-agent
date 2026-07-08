@@ -24,6 +24,17 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", "dist", ".turbo", "*.py", "*.lock", "*.toml", ".python-version"]
+    "ignore": [
+      "node_modules",
+      "dist",
+      ".turbo",
+      ".mypy_cache",
+      "**/.mypy_cache/**",
+      "*.py",
+      "*.lock",
+      "*.toml",
+      ".python-version",
+      "main.js"
+    ]
   }
 }

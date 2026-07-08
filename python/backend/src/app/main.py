@@ -1,6 +1,8 @@
 """FastAPI application entry point."""
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +14,7 @@ from app.routes.notes import router as notes_router
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     print(f"[server] AI Learning Backend v{VERSION} starting...")
     yield
     print("[server] shutting down...")
@@ -38,5 +40,5 @@ app.include_router(notes_router)
 
 
 @app.get("/")
-async def root():
+async def root() -> dict[str, Any]:
     return {"service": "AI Learning Agent Backend", "version": VERSION}

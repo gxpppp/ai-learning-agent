@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { type App, PluginSettingTab, Setting } from "obsidian";
 import type AILearningAgentPlugin from "./main";
 
 export class AISettingsTab extends PluginSettingTab {
@@ -45,16 +45,17 @@ export class AISettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("API key")
-      .setDesc("Your API key")
-      .addText((text) =>
+      .setDesc("Your API key (stored locally, never sent anywhere except to the LLM provider)")
+      .addText((text) => {
+        text.inputEl.type = "password";
         text
           .setPlaceholder("sk-...")
           .setValue(this.plugin.settings.llm.apiKey)
           .onChange(async (value) => {
             this.plugin.settings.llm.apiKey = value;
             await this.plugin.saveSettings();
-          }),
-      );
+          });
+      });
 
     new Setting(containerEl)
       .setName("Model")
@@ -79,8 +80,8 @@ export class AISettingsTab extends PluginSettingTab {
           .setPlaceholder("8765")
           .setValue(String(this.plugin.settings.server.port))
           .onChange(async (value) => {
-            const port = parseInt(value, 10);
-            if (!isNaN(port)) {
+            const port = Number.parseInt(value, 10);
+            if (!Number.isNaN(port)) {
               this.plugin.settings.server.port = port;
               await this.plugin.saveSettings();
             }

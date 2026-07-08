@@ -26,11 +26,11 @@ def _safe_path(vault_path: str, rel_path: str) -> str:
 
 
 @router.post("/create", response_model=NoteOperationResult)
-async def create_note(body: NoteCreateRequest):
+async def create_note(body: NoteCreateRequest) -> NoteOperationResult:
     full_path = _safe_path(body.vault_path, os.path.join(body.folder, body.filename))
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
     if os.path.exists(full_path):
-        return NoteOperationResult(success=False, error="File already exists", path=body.path if hasattr(body, 'path') else None)
+        return NoteOperationResult(success=False, error="File already exists")
     with open(full_path, "w", encoding="utf-8") as f:
         f.write(body.content)
     rel = os.path.relpath(full_path, body.vault_path).replace("\\", "/")
@@ -38,17 +38,17 @@ async def create_note(body: NoteCreateRequest):
 
 
 @router.post("/read", response_model=NoteOperationResult)
-async def read_note(body: NoteReadRequest):
+async def read_note(body: NoteReadRequest) -> NoteOperationResult:
     full_path = _safe_path(body.vault_path, body.path)
     if not os.path.exists(full_path):
         return NoteOperationResult(success=False, error="File not found")
-    with open(full_path, "r", encoding="utf-8") as f:
+    with open(full_path, encoding="utf-8") as f:
         content = f.read()
     return NoteOperationResult(success=True, path=body.path, content=content)
 
 
 @router.post("/update", response_model=NoteOperationResult)
-async def update_note(body: NoteUpdateRequest):
+async def update_note(body: NoteUpdateRequest) -> NoteOperationResult:
     full_path = _safe_path(body.vault_path, body.path)
     if not os.path.exists(full_path):
         return NoteOperationResult(success=False, error="File not found")
@@ -58,7 +58,7 @@ async def update_note(body: NoteUpdateRequest):
 
 
 @router.post("/delete", response_model=NoteOperationResult)
-async def delete_note(body: NoteDeleteRequest):
+async def delete_note(body: NoteDeleteRequest) -> NoteOperationResult:
     full_path = _safe_path(body.vault_path, body.path)
     if not os.path.exists(full_path):
         return NoteOperationResult(success=False, error="File not found")
