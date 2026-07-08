@@ -12,6 +12,8 @@ export class MessageRenderer {
   private app: App;
   private component: Component;
   private streamingContentEl: HTMLElement | null = null;
+  private thinkingEl: HTMLElement | null = null;
+  private thinkingText = "";
   private accumulatedText = "";
 
   constructor(app: App, component: Component) {
@@ -45,11 +47,25 @@ export class MessageRenderer {
     this.accumulatedText += token;
     this.streamingContentEl.setText(this.accumulatedText);
 
-    // Periodically do a full markdown render for code blocks etc.
-    // Every ~150ms use a debounced re-render.
     if (this.accumulatedText.endsWith("\n")) {
       this.debouncedMarkdownRender();
     }
+  }
+
+  /** Append thinking content — rendered as collapsible gray block. */
+  appendThinking(content: string): void {
+    if (!this.streamingContentEl) return;
+    if (!this.thinkingEl) {
+      const detail = createEl("details", { cls: "ai-thinking-block" });
+      detail.setAttribute("open", "true");
+      const summary = detail.createEl("summary", { cls: "ai-thinking-summary" });
+      summary.setText("💭 Thinking");
+      this.thinkingEl = detail.createDiv({ cls: "ai-thinking-content" });
+      const parent = this.streamingContentEl.parentElement;
+      if (parent) parent.insertBefore(detail, this.streamingContentEl);
+    }
+    this.thinkingText += content;
+    this.thinkingEl.setText(this.thinkingText);
   }
 
   private renderScheduled = false;
@@ -73,6 +89,8 @@ export class MessageRenderer {
     await MarkdownRenderer.render(this.app, text, this.streamingContentEl, "", this.component);
     this.streamingContentEl = null;
     this.accumulatedText = "";
+    this.thinkingEl = null;
+    this.thinkingText = "";
   }
 
   /** Render an error message in the container. */

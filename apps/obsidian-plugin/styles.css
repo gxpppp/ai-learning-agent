@@ -333,3 +333,30 @@
 .ai-tool-call-done {
   border-left: 3px solid var(--interactive-accent);
 }
+
+/* ─── Thinking Block ─────────────────────────────────────── */
+.ai-thinking-block {
+  margin: 6px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px dashed var(--text-faint);
+  border-radius: 6px;
+  background: var(--background-secondary);
+  font-size: 0.85em;
+}
+
+.ai-thinking-summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-style: italic;
+  user-select: none;
+}
+
+.ai-thinking-content {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}

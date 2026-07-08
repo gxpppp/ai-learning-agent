@@ -66,6 +66,8 @@ export class SidecarManager {
       LLM_API_KEY: this.config.providers?.[0]?.apiKey || "",
       LLM_MODEL: this.config.activeChatModel || "deepseek-chat",
       TOOL_PERMISSIONS: this.config.toolPermissions || "readonly",
+      REASONING_ENABLED: String(this.config.thinkingEnabled || false),
+      REASONING_EFFORT: this.config.reasoningEffort || "high",
       SERVER_PORT: String(port),
       SERVER_HOST: host,
       OBSIDIAN_VAULT_PATH: this.config.vaultPath,

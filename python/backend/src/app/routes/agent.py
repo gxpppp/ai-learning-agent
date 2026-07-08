@@ -16,7 +16,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from app.config import ACTIVE_AGENT_MODEL, ACTIVE_PROVIDER_ID, OBSIDIAN_VAULT_PATH, TOOL_PERMISSIONS
+from app.config import ACTIVE_AGENT_MODEL, ACTIVE_PROVIDER_ID, OBSIDIAN_VAULT_PATH, REASONING_EFFORT, REASONING_ENABLED, TOOL_PERMISSIONS
 import app.services.llm_manager as _llm_mgr
 from app.services.tool_registry import execute_tool, get_tools
 from pydantic import BaseModel
@@ -70,12 +70,17 @@ async def _agent_loop(
             return
 
         try:
+            extra: dict = {}
+            if REASONING_ENABLED:
+                extra["extra_body"] = {"thinking": {"type": "enabled"}}  # type: ignore[assignment]
             response = await client.async_client.chat.completions.create(
                 model=ACTIVE_AGENT_MODEL,
                 messages=messages,  # type: ignore[arg-type]
                 tools=tools,  # type: ignore[arg-type]
+                reasoning_effort=REASONING_EFFORT,  # type: ignore[arg-type]
                 stream=False,
-            )
+                **extra,  # type: ignore[arg-type]
+            )  # type: ignore[call-overload]
         except Exception as exc:
             logger.exception("Agent LLM call failed")
             yield _sse("error", {"message": str(exc)})
@@ -117,9 +122,14 @@ async def _agent_loop(
             continue
 
         # Regular text response
+        if getattr(msg, "reasoning_content", None):
+            yield _sse("thinking", {"content": msg.reasoning_content})
         if msg.content:
             yield _sse("token", {"content": msg.content})
-            messages.append({"role": "assistant", "content": msg.content})
+        asst_msg: dict[str, Any] = {"role": "assistant", "content": msg.content}
+        if getattr(msg, "reasoning_content", None):
+            asst_msg["reasoning_content"] = msg.reasoning_content
+        messages.append(asst_msg)
         break
 
     yield "data: [DONE]\n\n"

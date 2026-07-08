@@ -41,4 +41,7 @@ AUTO_INDEX = os.getenv("AUTO_INDEX", "false").lower() == "true"
 
 TOOL_PERMISSIONS = os.getenv("TOOL_PERMISSIONS", "readonly")
 
-VERSION = "0.4.0"
+REASONING_ENABLED = os.getenv("REASONING_ENABLED", "false").lower() == "true"
+REASONING_EFFORT = os.getenv("REASONING_EFFORT", "high")
+
+VERSION = "0.5.0"

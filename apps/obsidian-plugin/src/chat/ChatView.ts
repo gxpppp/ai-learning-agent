@@ -189,7 +189,10 @@ export class ChatView extends ItemView {
         if (dataPayload === "[DONE]") return fullText;
         try {
           const parsed = JSON.parse(dataPayload);
-          if (eventType === "token" && parsed.content) {
+          if (eventType === "thinking" && parsed.content) {
+            this.renderer.appendThinking(parsed.content);
+            this.scrollToBottomIfDesired();
+          } else if (eventType === "token" && parsed.content) {
             fullText += parsed.content;
             this.renderer.appendToken(parsed.content);
             this.scrollToBottomIfDesired();

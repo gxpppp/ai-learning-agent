@@ -19,6 +19,8 @@ export interface IAppConfig {
   activeAgentModel: string;
   server: IServerConfig;
   toolPermissions: "readonly" | "full";
+  thinkingEnabled: boolean;
+  reasoningEffort: "low" | "medium" | "high" | "max";
 }
 
 export const DEFAULT_PROVIDER: ILLMProvider = {
@@ -40,4 +42,6 @@ export const DEFAULT_CONFIG: IAppConfig = {
     host: "127.0.0.1",
   },
   toolPermissions: "readonly",
+  thinkingEnabled: false,
+  reasoningEffort: "high",
 };

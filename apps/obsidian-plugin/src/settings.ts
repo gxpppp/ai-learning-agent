@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type AILearningAgentPlugin from "./main";
 import type { ILLMProvider } from "@ai-tutor/shared-types";
 import { DEFAULT_PROVIDER } from "@ai-tutor/shared-types";
@@ -175,6 +175,34 @@ export class AISettingsTab extends PluginSettingTab {
         dd.setValue(this.plugin.settings.toolPermissions || "readonly");
         dd.onChange(async (v) => {
           this.plugin.settings.toolPermissions = v as "readonly" | "full";
+          await this.plugin.saveSettings();
+        });
+      });
+
+    // ─── Thinking Mode ───
+    containerEl.createEl("h3", { text: "Reasoning (Thinking Mode)" });
+    new Setting(containerEl)
+      .setName("Enable thinking mode")
+      .setDesc("DeepSeek V4 Pro/Flash will show its reasoning process before answering. Requires model that supports thinking.")
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.settings.thinkingEnabled || false);
+        toggle.onChange(async (v) => {
+          this.plugin.settings.thinkingEnabled = v;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Reasoning effort")
+      .setDesc("low/medium map to high. max only for deepseek-v4-pro.")
+      .addDropdown((dd) => {
+        dd.addOption("low", "low (fast)");
+        dd.addOption("medium", "medium");
+        dd.addOption("high", "high (deep, recommended)");
+        dd.addOption("max", "max (strongest, V4 Pro only)");
+        dd.setValue(this.plugin.settings.reasoningEffort || "high");
+        dd.onChange(async (v) => {
+          this.plugin.settings.reasoningEffort = v as "low" | "medium" | "high" | "max";
           await this.plugin.saveSettings();
         });
       });
