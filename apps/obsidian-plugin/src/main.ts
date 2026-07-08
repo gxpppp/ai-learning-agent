@@ -1,4 +1,4 @@
-import type { IAppConfig, ILLMConfig } from "@ai-tutor/shared-types";
+import type { IAppConfig, ILLMProvider } from "@ai-tutor/shared-types";
 import { DEFAULT_CONFIG } from "@ai-tutor/shared-types";
 import { Notice, Plugin } from "obsidian";
 import { CHAT_VIEW_TYPE, ChatView } from "./chat/ChatView";
@@ -185,6 +185,23 @@ export default class AILearningAgentPlugin extends Plugin {
   async loadSettings() {
     const data = await this.loadData();
     this.settings = { ...DEFAULT_CONFIG, ...data };
+
+    // Migrate old single-provider config to new multi-provider format
+    const old = data as { llm?: { baseUrl: string; apiKey: string; model: string } };
+    if (old?.llm) {
+      this.settings.providers = [
+        {
+          id: "deepseek",
+          name: "Migrated Provider",
+          baseUrl: old.llm.baseUrl || "https://api.deepseek.com/v1",
+          apiKey: old.llm.apiKey || "",
+          models: [old.llm.model || "deepseek-chat"],
+        },
+      ];
+      this.settings.activeChatModel = old.llm.model || "deepseek-chat";
+      this.settings.activeAgentModel = old.llm.model || "deepseek-chat";
+      await this.saveSettings();
+    }
   }
 
   getVaultBasePath(): string {

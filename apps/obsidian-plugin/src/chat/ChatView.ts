@@ -58,6 +58,23 @@ export class ChatView extends ItemView {
     container.empty();
     container.addClass("ai-chat-container");
 
+    // Model selector dropdown
+    const modelBar = container.createDiv({ cls: "ai-chat-model-bar" });
+    const models = this.plugin.settings.providers?.flatMap((p) => p.models || []) || [];
+    if (models.length > 0) {
+      const select = modelBar.createEl("select", { cls: "ai-chat-model-select" });
+      for (const m of models) {
+        const opt = select.createEl("option", { text: m, value: m });
+        if (m === this.plugin.settings.activeChatModel) opt.selected = true;
+      }
+      select.addEventListener("change", () => {
+        this.plugin.settings.activeChatModel = select.value;
+        this.plugin.saveSettings();
+      });
+    } else {
+      modelBar.createSpan({ text: this.plugin.settings.activeChatModel || "No model", cls: "ai-chat-model-label" });
+    }
+
     this.buildMessageArea(container);
     this.buildInputBar(container);
 
@@ -221,7 +238,7 @@ export class ChatView extends ItemView {
           },
           {
             baseUrl: `http://127.0.0.1:${port}`,
-            model: this.plugin.settings.llm.model,
+            model: this.plugin.settings.activeChatModel || "deepseek-chat",
             signal: this.abortController?.signal,
           },
         );
@@ -293,7 +310,7 @@ export class ChatView extends ItemView {
       let md = "---\n";
       md += `session_date: ${new Date().toISOString()}\n`;
       md += `message_count: ${this.messages.length}\n`;
-      md += `model: ${this.plugin.settings.llm.model}\n`;
+      md += `model: ${this.plugin.settings.activeChatModel || "unknown"}\n`;
       md += "---\n\n";
 
       for (const msg of this.messages) {

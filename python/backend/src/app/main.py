@@ -12,6 +12,7 @@ from app.config import (
     AUTO_INDEX,
     EMBEDDING_MODEL,
     OBSIDIAN_VAULT_PATH,
+    PROVIDERS_JSON,
     RAG_ENABLED,
     VERSION,
 )
@@ -27,6 +28,7 @@ from app.routes.vault import init_vault
 from app.routes.vault import router as vault_router
 from app.routes.wordcloud import init_wordcloud
 from app.routes.wordcloud import router as wordcloud_router
+from app.routes.models import router as models_router
 
 embedding_client = None
 vector_store = None
@@ -38,6 +40,14 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     global embedding_client, vector_store, file_watcher
 
     print(f"[server] AI Learning Backend v{VERSION} starting...")
+
+    # Initialize LLM Manager
+    print(f"[server] Initializing LLM Manager...")
+    from app.services.llm_manager import LLMManager, llm_manager as _llm_global
+    _llm = LLMManager(PROVIDERS_JSON)
+    import app.services.llm_manager as _lmm
+    _lmm.llm_manager = _llm
+    print(f"[server] LLM Manager ready ({len(_llm.providers)} providers).")
 
     if RAG_ENABLED and OBSIDIAN_VAULT_PATH:
         print(f"[server] Initializing embedding model: {EMBEDDING_MODEL}...")
@@ -106,6 +116,7 @@ app.include_router(rag_router)
 app.include_router(tags_router)
 app.include_router(vault_router)
 app.include_router(wordcloud_router)
+app.include_router(models_router)
 
 
 @app.get("/")

@@ -39,9 +39,13 @@ export class SidecarManager {
       }
     }
 
-    if (!this.config.llm.apiKey || this.config.llm.apiKey === "sk-placeholder") {
-      new Notice("AI Learning Agent: API key not configured. Open Settings → AI Learning Agent to set it.", 0);
-      throw new Error("API key not configured");
+    const firstProvider = this.config.providers?.[0];
+    if (!firstProvider || !firstProvider.apiKey) {
+      new Notice(
+        "AI Learning Agent: No API key configured. Open Settings → add a Provider with an API key.",
+        0,
+      );
+      throw new Error("No provider with API key configured");
     }
 
     if (!this.config.vaultPath) {
@@ -51,11 +55,17 @@ export class SidecarManager {
 
     // Start backend
     const { port, host } = this.config.server;
+    const providersJson = JSON.stringify(this.config.providers || []);
     const env = {
       ...process.env,
-      LLM_BASE_URL: this.config.llm.baseUrl,
-      LLM_API_KEY: this.config.llm.apiKey,
-      LLM_MODEL: this.config.llm.model,
+      PROVIDERS_JSON: providersJson,
+      ACTIVE_PROVIDER_ID: this.config.activeProviderId || "deepseek",
+      ACTIVE_CHAT_MODEL: this.config.activeChatModel || "deepseek-chat",
+      ACTIVE_AGENT_MODEL: this.config.activeAgentModel || "deepseek-chat",
+      LLM_BASE_URL: this.config.providers?.[0]?.baseUrl || "https://api.deepseek.com/v1",
+      LLM_API_KEY: this.config.providers?.[0]?.apiKey || "",
+      LLM_MODEL: this.config.activeChatModel || "deepseek-chat",
+      TOOL_PERMISSIONS: this.config.toolPermissions || "readonly",
       SERVER_PORT: String(port),
       SERVER_HOST: host,
       OBSIDIAN_VAULT_PATH: this.config.vaultPath,

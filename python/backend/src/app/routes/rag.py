@@ -11,10 +11,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from app.config import LLM_MODEL
+from app.config import ACTIVE_PROVIDER_ID, LLM_MODEL
 from app.models.rag import RagQueryRequest
 from app.services.embedding import EmbeddingClient
-from app.services.llm_client import client
+from app.services.llm_manager import llm_manager
 from app.services.prompts import TUTOR_SYSTEM_PROMPT
 from app.services.vector_store import VectorStore
 
@@ -69,7 +69,10 @@ async def _rag_stream(
     ]
 
     try:
-        stream = await client.async_client.chat.completions.create(
+        if not llm_manager:
+            raise Exception("LLM Manager not initialized")
+        rag_client = llm_manager.get_chat_client(ACTIVE_PROVIDER_ID, LLM_MODEL)
+        stream = await rag_client.async_client.chat.completions.create(
             model=LLM_MODEL,
             messages=messages,  # type: ignore[arg-type]
             temperature=0.7,
