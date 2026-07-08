@@ -2,6 +2,7 @@ import type { IAppConfig, ILLMProvider } from "@ai-tutor/shared-types";
 import { DEFAULT_CONFIG } from "@ai-tutor/shared-types";
 import { Notice, Plugin } from "obsidian";
 import { CHAT_VIEW_TYPE, ChatView } from "./chat/ChatView";
+import { GRAPH_VIEW_TYPE, GraphView } from "./knowledge/GraphView";
 import { WORDCLOUD_VIEW_TYPE, WordCloudView } from "./knowledge/WordCloudView";
 import { TagSuggestService } from "./knowledge/TagSuggest";
 import { OCR_VIEW_TYPE, OcrView } from "./ocr/OcrView";
@@ -20,6 +21,7 @@ export default class AILearningAgentPlugin extends Plugin {
     this.registerView(CHAT_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
     this.registerView(OCR_VIEW_TYPE, (leaf) => new OcrView(leaf, this));
     this.registerView(WORDCLOUD_VIEW_TYPE, (leaf) => new WordCloudView(leaf, this));
+    this.registerView(GRAPH_VIEW_TYPE, (leaf) => new GraphView(leaf, this));
 
     this.addRibbonIcon("message-square", "AI Tutor Chat", () => this.activateChatView());
 
@@ -95,6 +97,26 @@ export default class AILearningAgentPlugin extends Plugin {
       },
     });
 
+    // Knowledge graph
+    this.addCommand({
+      id: "open-graph",
+      name: "Open knowledge graph",
+      callback: () => this.activateGraphView(),
+    });
+
+    this.addCommand({
+      id: "refresh-graph",
+      name: "Knowledge graph: Refresh",
+      callback: async () => {
+        const leaf = this.app.workspace.getLeavesOfType(GRAPH_VIEW_TYPE)[0];
+        if (leaf?.view instanceof GraphView) {
+          await leaf.view.refresh();
+        } else {
+          await this.activateGraphView();
+        }
+      },
+    });
+
     // Tag & link commands
     this.addCommand({
       id: "suggest-tags",
@@ -140,6 +162,7 @@ export default class AILearningAgentPlugin extends Plugin {
     this.app.workspace.detachLeavesOfType(CHAT_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(OCR_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(WORDCLOUD_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(GRAPH_VIEW_TYPE);
     await this.stopSidecar();
   }
 
@@ -176,6 +199,19 @@ export default class AILearningAgentPlugin extends Plugin {
       const rightLeaf = workspace.getRightLeaf(false);
       if (rightLeaf) {
         await rightLeaf.setViewState({ type: WORDCLOUD_VIEW_TYPE, active: true });
+      }
+    } else {
+      workspace.revealLeaf(leaf);
+    }
+  }
+
+  async activateGraphView() {
+    const { workspace } = this.app;
+    const leaf = workspace.getLeavesOfType(GRAPH_VIEW_TYPE)[0];
+    if (!leaf) {
+      const rightLeaf = workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        await rightLeaf.setViewState({ type: GRAPH_VIEW_TYPE, active: true });
       }
     } else {
       workspace.revealLeaf(leaf);
