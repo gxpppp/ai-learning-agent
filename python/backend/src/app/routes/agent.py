@@ -18,7 +18,7 @@ from fastapi.responses import StreamingResponse
 
 from app.config import ACTIVE_AGENT_MODEL, ACTIVE_PROVIDER_ID, OBSIDIAN_VAULT_PATH, TOOL_PERMISSIONS
 from app.models.chat import ChatMessage
-from app.services.llm_manager import llm_manager
+import app.services.llm_manager as _llm_mgr
 from app.services.tool_registry import execute_tool, get_tools
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ async def _agent_loop(
     conversation: list[dict[str, Any]],
     request: Request,
 ) -> AsyncGenerator[str, None]:
-    if not llm_manager:
+    if not _llm_mgr.llm_manager:
         yield _sse("error", {"message": "LLM Manager not initialized"})
         return
 
@@ -62,7 +62,7 @@ async def _agent_loop(
         {"role": "user", "content": user_message},
     ]
 
-    client = llm_manager.get_chat_client(ACTIVE_PROVIDER_ID, ACTIVE_AGENT_MODEL)
+    client = _llm_mgr.llm_manager.get_chat_client(ACTIVE_PROVIDER_ID, ACTIVE_AGENT_MODEL)
 
     max_iterations = 8
     for _iter in range(max_iterations):

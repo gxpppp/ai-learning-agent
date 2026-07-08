@@ -13,7 +13,7 @@ from fastapi.responses import StreamingResponse
 
 from app.config import ACTIVE_CHAT_MODEL, ACTIVE_PROVIDER_ID, LLM_MODEL
 from app.models.chat import ChatRequest
-from app.services.llm_manager import llm_manager
+import app.services.llm_manager as _llm_mgr
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +29,9 @@ async def _stream_chat(
 ) -> AsyncGenerator[str, None]:
     """Yield SSE-formatted strings for the chat completion stream."""
     try:
-        if not llm_manager:
+        if not _llm_mgr.llm_manager:
             raise Exception("LLM Manager not initialized")
-        chat_client = llm_manager.get_chat_client(ACTIVE_PROVIDER_ID, model or LLM_MODEL)
+        chat_client = _llm_mgr.llm_manager.get_chat_client(ACTIVE_PROVIDER_ID, model or LLM_MODEL)
         stream = await chat_client.async_client.chat.completions.create(
             model=model or LLM_MODEL,
             messages=messages,  # type: ignore[arg-type]

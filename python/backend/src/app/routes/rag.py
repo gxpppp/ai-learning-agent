@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 from app.config import ACTIVE_PROVIDER_ID, LLM_MODEL
 from app.models.rag import RagQueryRequest
 from app.services.embedding import EmbeddingClient
-from app.services.llm_manager import llm_manager
+import app.services.llm_manager as _llm_mgr
 from app.services.prompts import TUTOR_SYSTEM_PROMPT
 from app.services.vector_store import VectorStore
 
@@ -69,9 +69,9 @@ async def _rag_stream(
     ]
 
     try:
-        if not llm_manager:
+        if not _llm_mgr.llm_manager:
             raise Exception("LLM Manager not initialized")
-        rag_client = llm_manager.get_chat_client(ACTIVE_PROVIDER_ID, LLM_MODEL)
+        rag_client = _llm_mgr.llm_manager.get_chat_client(ACTIVE_PROVIDER_ID, LLM_MODEL)
         stream = await rag_client.async_client.chat.completions.create(
             model=LLM_MODEL,
             messages=messages,  # type: ignore[arg-type]

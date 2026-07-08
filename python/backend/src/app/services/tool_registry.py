@@ -273,7 +273,7 @@ def _safe_path(vault_path: str, rel_path: str) -> str:
 
 
 async def _search_notes(args: dict, vault_path: str) -> str:
-    from app.services.llm_manager import llm_manager
+    import app.services.llm_manager as _lmm
     from app.services.embedding import EmbeddingClient
     from app.services.vector_store import VectorStore
     from app.config import EMBEDDING_MODEL
@@ -466,7 +466,7 @@ def _classify_note(args: dict, vault_path: str) -> str:
 
 
 async def _generate_summary(args: dict, vault_path: str) -> str:
-    from app.services.llm_manager import llm_manager
+    import app.services.llm_manager as _lmm
     from app.config import ACTIVE_PROVIDER_ID, ACTIVE_CHAT_MODEL
 
     full = _safe_path(vault_path, args["note_path"])
@@ -475,10 +475,10 @@ async def _generate_summary(args: dict, vault_path: str) -> str:
     with open(full, encoding="utf-8") as f:
         content = f.read()
 
-    if not llm_manager:
+    if not _lmm.llm_manager:
         return json.dumps({"error": "LLM not available"})
 
-    llm = llm_manager.get_chat_client(ACTIVE_PROVIDER_ID, ACTIVE_CHAT_MODEL)
+    llm = _lmm.llm_manager.get_chat_client(ACTIVE_PROVIDER_ID, ACTIVE_CHAT_MODEL)
     resp = await llm.async_client.chat.completions.create(
         model=ACTIVE_CHAT_MODEL,
         messages=[
