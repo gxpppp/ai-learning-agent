@@ -7,8 +7,11 @@ Supports fetching available models from /v1/models.
 from __future__ import annotations
 
 import json
+import logging
 
 from app.services.llm_client import LLMClient
+
+logger = logging.getLogger(__name__)
 
 
 class LLMManager:
@@ -33,7 +36,8 @@ class LLMManager:
         try:
             models = await client.async_client.models.list()
             return [m.id for m in models.data]
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to fetch models for %s: %s", provider_id, e)
             return self._cached_models(provider_id)
 
     def get_provider(self, provider_id: str) -> dict:

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -273,10 +272,9 @@ def _safe_path(vault_path: str, rel_path: str) -> str:
 
 
 async def _search_notes(args: dict, vault_path: str) -> str:
-    import app.services.llm_manager as _lmm
+    from app.config import EMBEDDING_MODEL
     from app.services.embedding import EmbeddingClient
     from app.services.vector_store import VectorStore
-    from app.config import EMBEDDING_MODEL
 
     store = VectorStore(vault_path)
     if store.count() == 0:
@@ -316,10 +314,10 @@ def _list_folder(args: dict, vault_path: str) -> str:
 
 
 def _suggest_tags(args: dict, vault_path: str) -> str:
-    from app.services.tag_service import suggest_tags as _st
-    from app.services.embedding import EmbeddingClient
-    from app.services.vector_store import VectorStore
     from app.config import EMBEDDING_MODEL
+    from app.services.embedding import EmbeddingClient
+    from app.services.tag_service import suggest_tags as _st
+    from app.services.vector_store import VectorStore
 
     store = VectorStore(vault_path)
     emb = EmbeddingClient(EMBEDDING_MODEL)
@@ -328,10 +326,10 @@ def _suggest_tags(args: dict, vault_path: str) -> str:
 
 
 def _recommend_links(args: dict, vault_path: str) -> str:
-    from app.services.tag_service import recommend_links as _rl
-    from app.services.embedding import EmbeddingClient
-    from app.services.vector_store import VectorStore
     from app.config import EMBEDDING_MODEL
+    from app.services.embedding import EmbeddingClient
+    from app.services.tag_service import recommend_links as _rl
+    from app.services.vector_store import VectorStore
 
     store = VectorStore(vault_path)
     emb = EmbeddingClient(EMBEDDING_MODEL)
@@ -467,7 +465,7 @@ def _classify_note(args: dict, vault_path: str) -> str:
 
 async def _generate_summary(args: dict, vault_path: str) -> str:
     import app.services.llm_manager as _lmm
-    from app.config import ACTIVE_PROVIDER_ID, ACTIVE_CHAT_MODEL
+    from app.config import ACTIVE_CHAT_MODEL, ACTIVE_PROVIDER_ID
 
     full = _safe_path(vault_path, args["note_path"])
     if not os.path.exists(full):

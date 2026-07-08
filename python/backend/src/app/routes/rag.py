@@ -11,10 +11,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+import app.services.llm_manager as _llm_mgr
 from app.config import ACTIVE_PROVIDER_ID, LLM_MODEL
 from app.models.rag import RagQueryRequest
 from app.services.embedding import EmbeddingClient
-import app.services.llm_manager as _llm_mgr
 from app.services.prompts import TUTOR_SYSTEM_PROMPT
 from app.services.vector_store import VectorStore
 

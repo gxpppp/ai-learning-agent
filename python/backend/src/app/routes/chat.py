@@ -11,9 +11,14 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from app.config import ACTIVE_CHAT_MODEL, ACTIVE_PROVIDER_ID, LLM_MODEL, REASONING_EFFORT, REASONING_ENABLED
-from app.models.chat import ChatRequest
 import app.services.llm_manager as _llm_mgr
+from app.config import (
+    ACTIVE_PROVIDER_ID,
+    LLM_MODEL,
+    REASONING_EFFORT,
+    REASONING_ENABLED,
+)
+from app.models.chat import ChatRequest
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ import os
 from datetime import UTC, datetime
 from typing import Any
 
-from app.config import ACTIVE_PROVIDER_ID, ACTIVE_CHAT_MODEL, OBSIDIAN_VAULT_PATH
+from app.config import ACTIVE_CHAT_MODEL, ACTIVE_PROVIDER_ID, OBSIDIAN_VAULT_PATH
 
 
 def _evolution_dir() -> str:
@@ -20,7 +20,7 @@ def _evolution_dir() -> str:
 def _load_active_prompt() -> str:
     path = os.path.join(_evolution_dir(), "VARIANTS", "active.md")
     if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return f.read()
     # Default: return agent system prompt
     return """You are an AI learning assistant with full control over the user's Obsidian vault.

@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-
 MUTATION_OPERATORS = {
     "shorten": "Delete >30% of redundant words while preserving core instructions.",
     "negative_space": "Rephrase positive rules as negative-space boundaries (e.g., 'Do X' → 'You must not skip X').",

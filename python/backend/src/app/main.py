@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -7,6 +8,9 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+logging.basicConfig(level=logging.INFO, format="[%(name)s] %(message)s")
+logger = logging.getLogger("server")
 
 from app.config import (
     AUTO_INDEX,
@@ -43,26 +47,26 @@ file_watcher = None
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     global embedding_client, vector_store, file_watcher
 
-    print(f"[server] AI Learning Backend v{VERSION} starting...")
+    logger.info(f"[server] AI Learning Backend v{VERSION} starting...")
 
     # Initialize LLM Manager
-    print(f"[server] Initializing LLM Manager...")
+    logger.info(f"[server] Initializing LLM Manager...")
     from app.services.llm_manager import LLMManager, llm_manager as _llm_global
     _llm = LLMManager(PROVIDERS_JSON)
     import app.services.llm_manager as _lmm
     _lmm.llm_manager = _llm
-    print(f"[server] LLM Manager ready ({len(_llm.providers)} providers).")
+    logger.info(f"[server] LLM Manager ready ({len(_llm.providers)} providers).")
 
     if RAG_ENABLED and OBSIDIAN_VAULT_PATH:
-        print(f"[server] Initializing embedding model: {EMBEDDING_MODEL}...")
+        logger.info(f"[server] Initializing embedding model: {EMBEDDING_MODEL}...")
         from app.services.embedding import EmbeddingClient
         embedding_client = EmbeddingClient(EMBEDDING_MODEL)
-        print(f"[server] Embedding dim={embedding_client.dimension} loaded.")
+        logger.info(f"[server] Embedding dim={embedding_client.dimension} loaded.")
 
-        print(f"[server] Initializing vector store at {OBSIDIAN_VAULT_PATH}/.ai-tutor/lancedb")
+        logger.info(f"[server] Initializing vector store at {OBSIDIAN_VAULT_PATH}/.ai-tutor/lancedb")
         from app.services.vector_store import VectorStore
         vector_store = VectorStore(OBSIDIAN_VAULT_PATH)
-        print(f"[server] Vector store ready ({vector_store.count()} chunks).")
+        logger.info(f"[server] Vector store ready ({vector_store.count()} chunks).")
 
         init_rag(embedding_client, vector_store)
         init_tags(embedding_client, vector_store, OBSIDIAN_VAULT_PATH)
@@ -93,7 +97,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
 
-    print("[server] shutting down...")
+    logger.info("[server] shutting down...")
     if file_watcher:
         file_watcher.stop()
 

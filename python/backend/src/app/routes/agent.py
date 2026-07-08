@@ -18,27 +18,13 @@ from fastapi.responses import StreamingResponse
 
 from app.config import ACTIVE_AGENT_MODEL, ACTIVE_PROVIDER_ID, OBSIDIAN_VAULT_PATH, REASONING_EFFORT, REASONING_ENABLED, TOOL_PERMISSIONS
 import app.services.llm_manager as _llm_mgr
+from app.services.prompts import AGENT_SYSTEM_PROMPT
 from app.services.tool_registry import execute_tool, get_tools
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
-
-AGENT_SYSTEM_PROMPT = """You are an AI learning assistant with full control over the user's Obsidian vault.
-
-You have access to tools that let you search, read, create, organize, and analyze notes.
-When the user asks you to do something, use the appropriate tools to accomplish it.
-
-Guidelines:
-1. Be proactive: if the user says "organize my notes", figure out what needs organizing.
-2. Be transparent: explain what you're doing before and after tool calls.
-3. Be efficient: chain tool calls when you need multiple pieces of information.
-4. Be helpful: after completing a task, summarize what you did and ask if they need more.
-
-The vault path is: {vault_path}
-Permission mode: {permission_mode}
-"""
 
 
 async def _agent_loop(

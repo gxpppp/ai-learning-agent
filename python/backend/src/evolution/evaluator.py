@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any
-
 
 RUBRIC_DIMENSIONS = {
     "accuracy": {"weight": 0.35, "prompt": "Is the answer factually correct? Any hallucinations?"},
@@ -21,7 +19,7 @@ def load_test_suite(vault_path: str) -> dict:
     if not os.path.exists(path):
         # Fallback to source directory
         path = os.path.join(os.path.dirname(__file__), "EVALS", "test_suite_v1.json")
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 

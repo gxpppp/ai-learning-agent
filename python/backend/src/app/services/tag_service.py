@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -9,6 +10,8 @@ import frontmatter
 
 from app.services.embedding import EmbeddingClient
 from app.services.vector_store import VectorStore
+
+logger = logging.getLogger(__name__)
 
 
 def _read_note_text(note_path: str, vault_path: str) -> str:
@@ -31,8 +34,8 @@ def _read_existing_tags(note_path: str, vault_path: str) -> list[str]:
             return [t.strip() for t in tags.split(",")]
         if isinstance(tags, list):
             return [str(t) for t in tags]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to read existing tags for %s: %s", note_path, e)
     return []
 
 
@@ -63,7 +66,8 @@ def suggest_tags(
         ]
         # Filter to meaningful tags
         tags = [kw for kw in keywords[:max_tags] if len(kw) > 1 and not kw.isdigit()]
-    except Exception:
+    except Exception as e:
+        logger.warning("TF-IDF tag extraction failed for %s: %s", note_path, e)
         tags = []
 
     return {"tags": tags[:max_tags], "confidence": min(0.9, len(tags) / max_tags)}

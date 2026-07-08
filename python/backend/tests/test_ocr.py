@@ -40,11 +40,6 @@ async def test_ocr_parse_and_save_disabled_by_default(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_ocr_parse_invalid_task(client: AsyncClient, monkeypatch):
-    monkeypatch.setenv("OCR_ENABLED", "true")
-    from app import config
-    monkeypatch.setattr(config, "OCR_ENABLED", True)
-    # Need to reload the router... actually this won't work easily in-memory.
-    # Just test validation on the request model.
     import pydantic
 
     from app.models.ocr import OcrParseRequest

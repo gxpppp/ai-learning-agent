@@ -7,10 +7,13 @@ Supports hybrid search: vector similarity + full-text.
 
 from __future__ import annotations
 
+import logging
 import os
 
 import lancedb
 import pyarrow as pa
+
+logger = logging.getLogger(__name__)
 
 DB_TABLE_NAME = "chunks"
 
@@ -106,8 +109,8 @@ class VectorStore:
         escaped = note_path.replace("'", "''")
         try:
             self.table.delete(f"note_path = '{escaped}'")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to delete chunks for %s: %s", note_path, e)
 
     def clear(self) -> None:
         self.db.drop_table(DB_TABLE_NAME)
