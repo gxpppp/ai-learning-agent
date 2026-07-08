@@ -2,6 +2,7 @@ import type { IAppConfig, ILLMConfig } from "@ai-tutor/shared-types";
 import { DEFAULT_CONFIG } from "@ai-tutor/shared-types";
 import { Notice, Plugin } from "obsidian";
 import { CHAT_VIEW_TYPE, ChatView } from "./chat/ChatView";
+import { WORDCLOUD_VIEW_TYPE, WordCloudView } from "./knowledge/WordCloudView";
 import { OCR_VIEW_TYPE, OcrView } from "./ocr/OcrView";
 import { AISettingsTab } from "./settings";
 import { SidecarManager } from "./sidecar";
@@ -17,6 +18,7 @@ export default class AILearningAgentPlugin extends Plugin {
 
     this.registerView(CHAT_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
     this.registerView(OCR_VIEW_TYPE, (leaf) => new OcrView(leaf, this));
+    this.registerView(WORDCLOUD_VIEW_TYPE, (leaf) => new WordCloudView(leaf, this));
 
     this.addRibbonIcon("message-square", "AI Tutor Chat", () => this.activateChatView());
 
@@ -74,12 +76,31 @@ export default class AILearningAgentPlugin extends Plugin {
       callback: () => this.stopSidecar(),
     });
 
+    // Word cloud
+    this.addCommand({
+      id: "open-wordcloud",
+      name: "Open word cloud",
+      callback: () => this.activateWordCloudView(),
+    });
+
+    this.addCommand({
+      id: "refresh-wordcloud",
+      name: "Word cloud: Refresh",
+      callback: async () => {
+        const leaf = this.app.workspace.getLeavesOfType(WORDCLOUD_VIEW_TYPE)[0];
+        if (leaf?.view instanceof WordCloudView) {
+          await leaf.view.refresh();
+        }
+      },
+    });
+
     this.startSidecar();
   }
 
   async onunload() {
     this.app.workspace.detachLeavesOfType(CHAT_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(OCR_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(WORDCLOUD_VIEW_TYPE);
     await this.stopSidecar();
   }
 
@@ -103,6 +124,19 @@ export default class AILearningAgentPlugin extends Plugin {
       const rightLeaf = workspace.getRightLeaf(false);
       if (rightLeaf) {
         await rightLeaf.setViewState({ type: OCR_VIEW_TYPE, active: true });
+      }
+    } else {
+      workspace.revealLeaf(leaf);
+    }
+  }
+
+  async activateWordCloudView() {
+    const { workspace } = this.app;
+    const leaf = workspace.getLeavesOfType(WORDCLOUD_VIEW_TYPE)[0];
+    if (!leaf) {
+      const rightLeaf = workspace.getRightLeaf(false);
+      if (rightLeaf) {
+        await rightLeaf.setViewState({ type: WORDCLOUD_VIEW_TYPE, active: true });
       }
     } else {
       workspace.revealLeaf(leaf);

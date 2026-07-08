@@ -5,6 +5,7 @@
 import type { IChatMessage } from "@ai-tutor/shared-types";
 import { type App, ItemView, Notice, type WorkspaceLeaf } from "obsidian";
 import type AILearningAgentPlugin from "../main";
+import { ragQuery } from "../rag/RagService";
 import { MessageRenderer } from "./MessageRenderer";
 import { streamChat } from "./sse-client";
 
@@ -155,47 +156,83 @@ export class ChatView extends ItemView {
     this.forceScrollToBottom();
 
     const port = this.plugin.settings.server.port;
-    const fullContent: IChatMessage[] = [
-      {
-        role: "system",
-        content: "You are an AI tutor. Use Socratic questioning. Be concise and helpful.",
-      },
-      ...this.messages.map((m) => ({
-        role: m.role as "system" | "user" | "assistant",
-        content: m.content,
-      })),
-    ];
 
     try {
-      const responseText = await streamChat(
-        fullContent,
+      let responseText = "";
+      let sources: Array<{ note_path: string; content: string; score: number }> = [];
+
+      responseText = await ragQuery(
+        content,
+        `http://127.0.0.1:${port}`,
         {
           onToken: (token: string) => {
             this.renderer.appendToken(token);
             this.scrollToBottomIfDesired();
           },
+          onSource: (srcs) => {
+            sources = srcs;
+          },
           onError: (msg: string) => {
-            new Notice(`Chat error: ${msg}`);
+            new Notice(`RAG error: ${msg}`);
           },
           onDone: () => {},
         },
-        {
-          baseUrl: `http://127.0.0.1:${port}`,
-          model: this.plugin.settings.llm.model,
-          signal: this.abortController.signal,
-        },
+        this.abortController.signal,
       );
+
+      // Append source citations
+      if (sources.length > 0) {
+        const citationMd = sources
+          .map(
+            (s, i) =>
+              `> [${i + 1}] **${s.note_path}** (${(s.score * 100).toFixed(0)}%)\n> ${s.content.trim()}`,
+          )
+          .join("\n\n");
+        responseText += `\n\n---\n**Sources:**\n${citationMd}`;
+        this.renderer.appendToken(`\n\n---\n**Sources:**\n${citationMd}`);
+        this.scrollToBottomIfDesired();
+      }
 
       await this.renderer.finishStreaming();
       this.addMessage("assistant", responseText);
       await this.saveSession();
     } catch (err: unknown) {
-      if (this.abortController?.signal.aborted) {
+      // Fallback to direct chat if RAG fails
+      let fellBack = true;
+      try {
+        const fullContent: IChatMessage[] = [
+          { role: "system" as const, content: "You are an AI tutor. Use Socratic questioning." },
+          ...this.messages.map((m) => ({
+            role: m.role as "system" | "user" | "assistant",
+            content: m.content,
+          })),
+        ];
+        const fallbackText = await streamChat(
+          fullContent,
+          {
+            onToken: (t: string) => {
+              this.renderer.appendToken(t);
+              this.scrollToBottomIfDesired();
+            },
+            onError: () => {},
+            onDone: () => {},
+          },
+          {
+            baseUrl: `http://127.0.0.1:${port}`,
+            model: this.plugin.settings.llm.model,
+            signal: this.abortController?.signal,
+          },
+        );
+        fellBack = false;
         await this.renderer.finishStreaming();
-        const partial = this.messagesEl.querySelector(".ai-chat-content")?.textContent ?? "";
-        this.addMessage("assistant", `${partial}\n\n*[Stopped]*`);
+        this.addMessage("assistant", fallbackText);
         await this.saveSession();
-      } else {
+      } catch {
+        // both failed
+      }
+
+      if (fellBack) {
+        await this.renderer.finishStreaming();
         const msg = err instanceof Error ? err.message : String(err);
         this.renderer.renderError(assistantMsgEl, msg);
       }

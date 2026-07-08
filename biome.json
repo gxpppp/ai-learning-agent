@@ -30,6 +30,8 @@
       ".turbo",
       ".mypy_cache",
       "**/.mypy_cache/**",
+      ".venv",
+      "**/.venv/**",
       "*.py",
       "*.lock",
       "*.toml",
