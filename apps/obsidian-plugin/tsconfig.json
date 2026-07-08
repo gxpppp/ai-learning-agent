@@ -1,0 +1,7 @@
+{
+  "extends": "@ai-tutor/typescript-config/obsidian-plugin.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "esbuild.config.mjs"]
+}

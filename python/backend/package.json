@@ -1,0 +1,14 @@
+{
+  "name": "@ai-tutor/backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8765",
+    "build": "uv sync",
+    "lint": "uv run ruff check src/",
+    "format": "uv run ruff format src/",
+    "check-types": "uv run mypy src/",
+    "test": "uv run pytest",
+    "clean": "rm -rf dist build *.egg-info __pycache__ .pytest_cache .mypy_cache"
+  }
+}

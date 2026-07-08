@@ -1,0 +1,10 @@
+{
+  "id": "ai-learning-agent",
+  "name": "AI Learning Agent",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "AI-native learning enhancement with multi-agent collaboration, knowledge graphs, and self-evolution.",
+  "author": "gxpppp",
+  "authorUrl": "https://github.com/gxpppp/ai-learning-agent",
+  "isDesktopOnly": true
+}

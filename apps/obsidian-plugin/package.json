@@ -1,0 +1,21 @@
+{
+  "name": "@ai-tutor/obsidian-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production",
+    "lint": "biome check src/",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist main.js main.js.map styles.css"
+  },
+  "devDependencies": {
+    "@ai-tutor/eslint-config": "workspace:*",
+    "@ai-tutor/shared-types": "workspace:*",
+    "@ai-tutor/typescript-config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "^1.7.0",
+    "typescript": "^5.7.0"
+  }
+}
