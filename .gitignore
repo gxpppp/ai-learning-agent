@@ -42,6 +42,15 @@ Thumbs.db
 # OpenHarness reference
 .ohmo/
 
+# Docker
+docker/embedding/models/
+*.tar
+*.tar.gz
+
+# Model caches (downloaded at runtime, 2GB+)
+models/
+.paddlex/
+
 # Debug artifacts
 _debug_ocr.py
 *.jpg
