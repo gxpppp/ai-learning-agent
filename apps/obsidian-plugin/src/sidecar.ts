@@ -55,7 +55,7 @@ export class SidecarManager {
 
     // Kill any zombie process on our port before starting
     const { port, host } = this.config.server;
-    this._killStaleProcess(port);
+    _killStaleProcess(port);
 
     // Start backend
     const providersJson = JSON.stringify(this.config.providers || []);
