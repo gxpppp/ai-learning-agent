@@ -8,8 +8,9 @@ import logging
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 import app.llm.manager as _llm_mgr
 from app.config import ACTIVE_PROVIDER_ID, LLM_MODEL
@@ -110,6 +111,47 @@ async def _rag_stream(
         logger.exception("RAG stream error")
         payload = json.dumps({"message": str(exc)})
         yield f"event: error\ndata: {payload}\n\n"
+
+
+@router.post("/multi-query")
+async def rag_multi_query(
+    queries: list[str],
+    top_k: int = 5,
+) -> dict:
+    """Search multiple queries in parallel and merge results.
+
+    Returns deduplicated chunks sorted by score.
+    """
+    if not embedding_client or not vector_store:
+        raise HTTPException(status_code=503, detail="RAG not initialized")
+
+    # Parallel search
+    def search_one(q: str) -> list[dict]:
+        assert embedding_client and vector_store
+        vec = embedding_client.encode_query(q)
+        return vector_store.search(vec, top_k=top_k)
+
+    results_per_query = await asyncio.gather(*[asyncio.to_thread(search_one, q) for q in queries])
+
+    # Merge + deduplicate by note_path
+    seen: set[str] = set()
+    merged: list[dict] = []
+    for results in results_per_query:
+        for c in results:
+            key = c.get("note_path", "") + c.get("content", "")[:50]
+            if key not in seen:
+                seen.add(key)
+                merged.append(c)
+
+    merged.sort(key=lambda c: c.get("score", 0), reverse=True)
+
+    return {
+        "queries": len(queries),
+        "results": [
+            {"note_path": c["note_path"], "content": c["content"][:300], "score": c["score"]}
+            for c in merged[:top_k * 2]
+        ],
+    }
 
 
 @router.post("/query")

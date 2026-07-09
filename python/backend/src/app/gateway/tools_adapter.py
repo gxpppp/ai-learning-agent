@@ -237,6 +237,23 @@ class OcrDocumentTool(_VaultTool):
         }, vault_path)
 
 
+class IndexNoteInput(BaseModel):
+    note_path: str = Field(default="", description="Path to .md in vault")
+    file_path: str = Field(default="", description="Path alias")
+    path: str = Field(default="", description="Path alias")
+
+
+class IndexNoteTool(_VaultTool):
+    name = "index_note"
+    description = "Vectorize a single note for semantic search"
+    input_model = IndexNoteInput
+
+    async def _do_execute(self, args: IndexNoteInput, vault_path: str, ctx: ToolExecutionContext) -> str:
+        from app.core.tool_registry import execute_tool
+        p = args.note_path or args.file_path or args.path
+        return await execute_tool("index_note", {"note_path": p}, vault_path)
+
+
 class ClassifyNoteInput(BaseModel):
     note_path: str = Field(description="Path to the note")
 
@@ -322,6 +339,8 @@ def create_vault_tool_registry() -> ToolRegistry:
     registry.register(ClassifyNoteTool())
     registry.register(GenerateSummaryTool())
     registry.register(GetVaultStatusTool())
+    # Indexing
+    registry.register(IndexNoteTool())
     # Web
     registry.register(WebSearchTool())
     return registry

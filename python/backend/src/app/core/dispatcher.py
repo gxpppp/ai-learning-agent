@@ -22,6 +22,7 @@ _COMPLEX_EXACT = [
     "organize", "classify", "batch", "all of", "every note",
     "帮我把", "给我把", "重构", "迁移", "同步",
     "创建目录", "创建文件夹", "移动到",
+    "向量化", "索引", "index vault",
 ]
 
 # Medium-confidence indicators (need ≥2 matches)

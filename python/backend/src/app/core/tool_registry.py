@@ -216,6 +216,20 @@ FULL_TOOLS = READONLY_TOOLS + [
             "parameters": {"type": "object", "properties": {}},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "index_note",
+            "description": "Vectorize a single note in the vault for semantic search.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "note_path": {"type": "string", "description": "Path to the .md file in vault"},
+                },
+                "required": ["note_path"],
+            },
+        },
+    },
 ]
 
 
@@ -264,6 +278,8 @@ async def execute_tool(
             return await _generate_summary(args, vault_path)
         if name == "get_vault_status":
             return _get_vault_status(vault_path)
+        if name == "index_note":
+            return await _index_single_note(args, vault_path)
         return json.dumps({"error": f"Unknown tool: {name}"})
     except Exception as exc:
         import traceback
@@ -541,6 +557,26 @@ async def _generate_summary(args: dict, vault_path: str) -> str:
     with open(full, "w", encoding="utf-8") as f:
         f.write(new_content)
     return json.dumps({"summarized": note_path, "summary": summary[:200]})
+
+
+async def _index_single_note(args: dict, vault_path: str) -> str:
+    """Vectorize a single note."""
+    note_path = _arg(args, "note_path", "file_path", "path")
+    if not note_path:
+        return json.dumps({"error": "Missing note_path"})
+    full = _safe_path(vault_path, note_path)
+    if not os.path.exists(full):
+        return json.dumps({"error": f"File not found: {note_path}"})
+
+    from app.config import EMBEDDING_MODEL
+    from app.infra.embedding import EmbeddingClient
+    from app.infra.indexer import index_note
+    from app.infra.vector_store import VectorStore
+
+    emb = EmbeddingClient(EMBEDDING_MODEL)
+    store = VectorStore(vault_path)
+    chunks = index_note(full, vault_path, emb, store)
+    return json.dumps({"indexed": note_path, "chunks": chunks})
 
 
 def _get_vault_status(vault_path: str) -> str:
