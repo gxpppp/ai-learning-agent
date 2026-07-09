@@ -54,13 +54,10 @@ export class SidecarManager {
     }
 
     // Kill any zombie process on our port before starting
-    const killed = this.killPortProcess(port);
-    if (killed) {
-      console.log(`[sidecar] Killed stale process on port ${port}`);
-    }
+    const { port, host } = this.config.server;
+    this._killStaleProcess(port);
 
     // Start backend
-    const { port, host } = this.config.server;
     const providersJson = JSON.stringify(this.config.providers || []);
     const env = {
       ...process.env,
@@ -193,34 +190,28 @@ export class SidecarManager {
   private runSync(cmd: string, args: string[], opts: Record<string, unknown>): void {
     execSync(`${cmd} ${args.join(" ")}`, { stdio: "inherit", ...opts });
   }
+}
 
-  private killPortProcess(port: number): boolean {
-    // Local require avoids esbuild bundled closure TDZ
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const cp = require("node:child_process");
-    const _exec = cp.execSync as typeof execSync;
-    try {
-      if (process.platform === "win32") {
-        const out = _exec(
-          `netstat -ano | findstr ":${port}" | findstr "LISTENING"`,
-          { encoding: "utf-8", timeout: 3000 },
-        );
-        const lines = out.trim().split("\n");
-        for (const line of lines) {
-          const parts = line.trim().split(/\s+/);
-          const pid = parts[parts.length - 1];
-          if (pid && /^\d+$/.test(pid)) {
-            _exec(`taskkill /PID ${pid} /F`, { timeout: 3000 });
-            return true;
-          }
+// Standalone function (not a class method) to avoid esbuild method TDZ
+function _killStaleProcess(port: number): void {
+  try {
+    if (process.platform === "win32") {
+      const out = execSync(
+        `netstat -ano | findstr ":${port}" | findstr "LISTENING"`,
+        { encoding: "utf-8", timeout: 3000 },
+      );
+      for (const line of out.trim().split("\n")) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && /^\d+$/.test(pid)) {
+          execSync(`taskkill /PID ${pid} /F`, { timeout: 3000 });
+          return;
         }
-      } else {
-        _exec(`lsof -ti:${port} | xargs kill -9`, { timeout: 3000 });
-        return true;
       }
-    } catch {
-      // no process on port — nothing to kill
+    } else {
+      execSync(`lsof -ti:${port} | xargs kill -9`, { timeout: 3000 });
     }
-    return false;
+  } catch {
+    // port is free
   }
 }
