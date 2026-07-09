@@ -5,8 +5,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir \
     fastapi==0.115 \
     uvicorn==0.30 \
-    sentence-transformers==3.0 \
-    && python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')"
+    sentence-transformers==3.0
 
 COPY server.py .
 
