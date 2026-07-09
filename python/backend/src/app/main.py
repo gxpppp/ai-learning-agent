@@ -2,6 +2,9 @@
 
 import logging
 import os
+import socket
+import subprocess
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -34,6 +37,8 @@ from app.config import (
     OBSIDIAN_VAULT_PATH,
     PROVIDERS_JSON,
     RAG_ENABLED,
+    SERVER_HOST,
+    SERVER_PORT,
     VERSION,
 )
 from app.core.logging import setup_logging
@@ -107,6 +112,33 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("[server] shutting down...")
     if file_watcher:
         file_watcher.stop()
+
+
+# ── Port protection: kill stale backend on our port ──
+def _ensure_port_free(host: str, port: int) -> None:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(0.5)
+    if s.connect_ex((host, port)) == 0:
+        s.close()
+        logger.info(f"[server] port {port} in use — killing stale process")
+        try:
+            if sys.platform == "win32":
+                subprocess.run(
+                    f'for /f "tokens=5" %a in (\'netstat -ano ^| findstr :{port} ^| findstr LISTENING\') do taskkill /F /PID %a',
+                    shell=True, timeout=5, capture_output=True,
+                )
+            else:
+                subprocess.run(
+                    f"lsof -ti:{port} | xargs kill -9",
+                    shell=True, timeout=5, capture_output=True,
+                )
+        except Exception:
+            pass
+    else:
+        s.close()
+
+
+_ensure_port_free(SERVER_HOST, SERVER_PORT)
 
 
 app = FastAPI(

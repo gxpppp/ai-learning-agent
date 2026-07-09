@@ -53,6 +53,12 @@ export class SidecarManager {
       throw new Error("Vault path not configured");
     }
 
+    // Kill any zombie process on our port before starting
+    const killed = this.killPortProcess(port);
+    if (killed) {
+      console.log(`[sidecar] Killed stale process on port ${port}`);
+    }
+
     // Start backend
     const { port, host } = this.config.server;
     const providersJson = JSON.stringify(this.config.providers || []);
@@ -186,5 +192,31 @@ export class SidecarManager {
 
   private runSync(cmd: string, args: string[], opts: Record<string, unknown>): void {
     execSync(`${cmd} ${args.join(" ")}`, { stdio: "inherit", ...opts });
+  }
+
+  private killPortProcess(port: number): boolean {
+    try {
+      if (process.platform === "win32") {
+        const out = execSync(
+          `netstat -ano | findstr ":${port}" | findstr "LISTENING"`,
+          { encoding: "utf-8", timeout: 3000 },
+        );
+        const lines = out.trim().split("\n");
+        for (const line of lines) {
+          const parts = line.trim().split(/\s+/);
+          const pid = parts[parts.length - 1];
+          if (pid && /^\d+$/.test(pid)) {
+            execSync(`taskkill /PID ${pid} /F`, { timeout: 3000 });
+            return true;
+          }
+        }
+      } else {
+        execSync(`lsof -ti:${port} | xargs kill -9`, { timeout: 3000 });
+        return true;
+      }
+    } catch {
+      // no process on port — nothing to kill
+    }
+    return false;
   }
 }
