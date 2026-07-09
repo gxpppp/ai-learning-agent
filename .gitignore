@@ -6,7 +6,6 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
-apps/obsidian-plugin/main.js
 
 # Python
 __pycache__/
