@@ -123,10 +123,10 @@ export class ChatView extends ItemView {
 
   async sendMessage(): Promise<void> {
     let content = this.inputEl.value.trim();
-    const paths = this.uploadZone.getUploadedPaths();
-    if (paths.length > 0) {
-      const fileHints = paths.map((p) => `[File: ${p}]`).join("\n");
-      content = content ? `${fileHints}\n${content}` : fileHints;
+    const uploaded = this.uploadZone.getProcessedFiles();
+    if (uploaded.length > 0) {
+      const names = uploaded.map((f) => f.name || f.filename).join(", ");
+      content = content || `处理好的文件: ${names}`;
       this.uploadZone.clear();
     }
     if (!content || this.isStreaming) return;

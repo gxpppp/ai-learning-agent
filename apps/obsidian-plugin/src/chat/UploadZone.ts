@@ -2,9 +2,18 @@
 
 import { Notice } from "obsidian";
 
+interface UploadResult {
+  filename: string;
+  name: string;
+  size: number;
+  chunks: number;
+  status: string;
+  type: string;
+}
+
 export class UploadZone {
   private container: HTMLElement;
-  private files: Array<{ name: string; size: number; path?: string }> = [];
+  private files: Array<{ name: string; size: number; result?: UploadResult }> = [];
   private port: number;
 
   constructor(container: HTMLElement, port: number) {
@@ -18,18 +27,30 @@ export class UploadZone {
     this.container.empty();
     if (this.files.length === 0) {
       const hint = this.container.createDiv({ cls: "ai-upload-hint" });
-      hint.setText("Drop PDF/images here to scan (OCR → notes)");
+      hint.setText("Drop PDF/images here to scan (OCR \u2192 notes)");
     } else {
       for (let i = 0; i < this.files.length; i++) {
         const f = this.files[i];
         if (!f) continue;
         const row = this.container.createDiv({ cls: "ai-upload-file" });
         const icon = row.createSpan({ cls: "ai-upload-file-icon" });
-        icon.setText(this.fileIcon(f.name));
-        row.createSpan({ cls: "ai-upload-file-name", text: f.name });
-        row.createSpan({ cls: "ai-upload-file-size", text: this.formatSize(f.size) });
+        const done = f.result?.status === "done";
+        icon.setText(done ? "\u2705" : this.fileIcon(f.name));
+
+        const info = row.createSpan({ cls: "ai-upload-file-name" });
+        if (done && f.result) {
+          info.setText(`${f.name} \u2192 ${f.result.name} (${f.result.chunks} chunks)`);
+        } else {
+          info.setText(f.name);
+        }
+
+        row.createSpan({
+          cls: "ai-upload-file-size",
+          text: this.formatSize(f.size),
+        });
+
         const rm = row.createSpan({ cls: "ai-upload-file-rm" });
-        rm.setText("×");
+        rm.setText("\u00d7");
         rm.addEventListener("click", () => {
           this.files.splice(i, 1);
           this.render();
@@ -40,8 +61,9 @@ export class UploadZone {
 
   private fileIcon(name: string): string {
     const ext = name.split(".").pop()?.toLowerCase() || "";
-    if (ext === "pdf") return "📄";
-    return "🖼️";
+    if (ext === "pdf") return "\ud83d\udcc4";
+    if (ext === "md") return "\ud83d\udcdd";
+    return "\ud83d\uddbc\ufe0f";
   }
 
   private formatSize(bytes: number): string {
@@ -70,10 +92,10 @@ export class UploadZone {
         this.files.push({ name: file.name, size: file.size });
         this.render();
         try {
-          const path = await this.uploadFile(file);
+          const result = await this.uploadFile(file);
           const entry = this.files.find((f) => f.name === file.name);
-          if (entry) entry.path = path;
-        } catch (err) {
+          if (entry) entry.result = result;
+        } catch {
           new Notice(`Upload failed: ${file.name}`);
         }
         this.render();
@@ -84,7 +106,7 @@ export class UploadZone {
       const input = document.createElement("input");
       input.type = "file";
       input.multiple = true;
-      input.accept = ".pdf,.png,.jpg,.jpeg,.bmp,.tiff,.tif,.webp";
+      input.accept = ".pdf,.png,.jpg,.jpeg,.bmp,.tiff,.tif,.webp,.md";
       input.addEventListener("change", async () => {
         if (!input.files) return;
         for (let i = 0; i < input.files.length; i++) {
@@ -93,10 +115,10 @@ export class UploadZone {
           this.files.push({ name: file.name, size: file.size });
           this.render();
           try {
-            const path = await this.uploadFile(file);
+            const result = await this.uploadFile(file);
             const entry = this.files.find((f) => f.name === file.name);
-            if (entry) entry.path = path;
-          } catch (err) {
+            if (entry) entry.result = result;
+          } catch {
             new Notice(`Upload failed: ${file.name}`);
           }
           this.render();
@@ -108,7 +130,7 @@ export class UploadZone {
     });
   }
 
-  private async uploadFile(file: File): Promise<string> {
+  private async uploadFile(file: File): Promise<UploadResult> {
     const formData = new FormData();
     formData.append("file", file);
     const resp = await fetch(`http://127.0.0.1:${this.port}/api/upload/`, {
@@ -116,12 +138,15 @@ export class UploadZone {
       body: formData,
     });
     if (!resp.ok) throw new Error(`Upload failed (${resp.status})`);
-    const data = await resp.json();
-    return data.file_path;
+    return resp.json();
+  }
+
+  getProcessedFiles(): UploadResult[] {
+    return this.files.filter((f) => f.result?.status === "done").map((f) => f.result!);
   }
 
   getUploadedPaths(): string[] {
-    return this.files.filter((f) => f.path).map((f) => f.path!);
+    return this.files.filter((f) => f.result).map((f) => `Inbox/${f.result!.name}`);
   }
 
   clear(): void {
