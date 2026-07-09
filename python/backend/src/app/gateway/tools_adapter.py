@@ -202,7 +202,8 @@ class MoveNoteTool(_VaultTool):
 
 
 class OcrDocumentInput(BaseModel):
-    file_path: str = Field(description="Absolute path to image/PDF file")
+    file_path: str = Field(default="", description="Absolute path to image/PDF file")
+    image_path: str = Field(default="", description="Path to image/PDF file (alias)")
     output_folder: str = Field(default="OCR", description="Folder to save result")
 
 
@@ -213,8 +214,9 @@ class OcrDocumentTool(_VaultTool):
 
     async def _do_execute(self, args: OcrDocumentInput, vault_path: str, ctx: ToolExecutionContext) -> str:
         from app.core.tool_registry import execute_tool
+        path = args.file_path or args.image_path
         return await execute_tool("ocr_document", {
-            "file_path": args.file_path, "output_folder": args.output_folder,
+            "file_path": path, "output_folder": args.output_folder,
         }, vault_path)
 
 

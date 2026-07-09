@@ -29,6 +29,8 @@ class GatewayCoordinator:
     def __init__(self, vault_path: str, permission_mode: str = "readonly"):
         self.vault_path = vault_path
         self.permission_mode = permission_mode
+        self._call_seq = 0
+        self._tool_times: dict[str, float] = {}
 
     async def execute(
         self,
@@ -94,6 +96,8 @@ class GatewayCoordinator:
 
     def _map_event(self, event: StreamEvent) -> str | None:
         """Map OpenHarness StreamEvent to our SSE event string."""
+        import time
+
         from app.core.event_bus import (
             error_event,
             token_event,
@@ -106,10 +110,23 @@ class GatewayCoordinator:
                 return token_event(text)
 
             case ToolExecutionStarted(tool_name=name, tool_input=inp):
-                return tool_call_event(name, name, inp)
+                self._call_seq += 1
+                tid = f"{name}_{self._call_seq}"
+                self._tool_times[tid] = time.time()
+                return tool_call_event(tid, name, inp)
 
-            case ToolExecutionCompleted(tool_name=name, output=out, is_error=_):
-                return tool_result_event(name, name, out, 0)
+            case ToolExecutionCompleted(tool_name=name, output=out, is_error=_is_err):
+                # Find the matching start time
+                elapsed = 0
+                for tid, t0 in list(self._tool_times.items()):
+                    if tid.startswith(name + "_"):
+                        elapsed = int((time.time() - t0) * 1000)
+                        del self._tool_times[tid]
+                        return tool_result_event(tid, name, out, elapsed)
+
+                self._call_seq += 1
+                tid = f"{name}_{self._call_seq}"
+                return tool_result_event(tid, name, out, 0)
 
             case ErrorEvent(message=msg):
                 return error_event(msg)

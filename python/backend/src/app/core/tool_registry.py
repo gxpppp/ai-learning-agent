@@ -398,12 +398,15 @@ def _move_note(args: dict, vault_path: str) -> str:
 async def _ocr_document(args: dict, vault_path: str) -> str:
     import base64
 
-    file_path = args["file_path"]
+    file_path = args.get("file_path") or args.get("image_path", "")
+    if not os.path.isabs(file_path):
+        file_path = os.path.join(vault_path, file_path)
     if not os.path.exists(file_path):
         return json.dumps({"error": f"File not found: {file_path}"})
 
     output_folder = args.get("output_folder", "OCR")
     stem = Path(file_path).stem
+    md = f"# {stem}\n\n*OCR not available. Enable it with OCR_ENABLED=true.*"
 
     # Try OCR endpoint if available
     try:
@@ -424,9 +427,11 @@ async def _ocr_document(args: dict, vault_path: str) -> str:
                 ]}],
                 temperature=0.0,
             )
-            md = resp.choices[0].message.content or ""
+            extracted = resp.choices[0].message.content or ""
+            if extracted.strip():
+                md = extracted
     except Exception:
-        md = f"# {stem}\n\n*OCR not available. Check OCR_ENABLED and Docker.*"
+        pass  # keep default md
 
     # Save to vault
     out_dir = _safe_path(vault_path, output_folder)
