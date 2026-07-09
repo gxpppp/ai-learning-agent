@@ -32,7 +32,7 @@ class _CompactFormatter(logging.Formatter):
             "src": record.name.replace("app.", ""),
             "msg": record.getMessage(),
         }
-        for key in ("trace_id", "tool", "args", "result", "ms", "vault", "error"):
+        for key in ("trace_id", "tool", "args", "input", "result", "ms", "vault", "error"):
             val = getattr(record, key, None)
             if val is not None:
                 entry[key] = str(val)[:200]

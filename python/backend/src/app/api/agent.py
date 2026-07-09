@@ -71,7 +71,7 @@ async def _agent_loop(
 ) -> AsyncGenerator[str, None]:
     trace_id = new_trace_id()
     tracer.info("request", extra={"trace_id": trace_id,
-        "msg": user_message[:100], "vault": OBSIDIAN_VAULT_PATH[:50]})
+        "input": user_message[:100], "vault": OBSIDIAN_VAULT_PATH[:50]})
 
     if not _llm_mgr.llm_manager:
         yield error_event("LLM Manager not initialized")
