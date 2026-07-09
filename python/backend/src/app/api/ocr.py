@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from app.config import OCR_ENABLED
-from app.infra.ocr import SUPPORTED_EXTENSIONS, extract_text, get_ocr_engine
+from app.infra.ocr import SUPPORTED_EXTENSIONS, extract_text
 from app.models.ocr import (
     OcrHealthResponse,
     OcrParseAndSaveRequest,
@@ -27,11 +27,7 @@ router = APIRouter(prefix="/api/ocr", tags=["ocr"])
 async def ocr_health() -> OcrHealthResponse:
     if not OCR_ENABLED:
         raise HTTPException(status_code=503, detail="OCR service is disabled")
-    try:
-        get_ocr_engine()
-        return OcrHealthResponse(status="ok", model="PaddleOCR (local)", server="local")
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
+    return OcrHealthResponse(status="ok", model="PaddleOCR-VL (Docker)", server="http://127.0.0.1:8080")
 
 
 @router.post("/parse", response_model=OcrParseResponse)

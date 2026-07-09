@@ -1,45 +1,26 @@
-"""Unified OCR engine — PaddleOCR (GPU) for images + PyMuPDF→PaddleOCR for PDFs.
+"""OCR engine — PaddleOCR-VL via Docker vLLM (OpenAI-compatible API).
 
-Single entry point: extract_text(file_path) handles both images and PDFs.
-All processing is local — zero remote API dependencies.
+PDFs are rendered page-by-page via PyMuPDF, then each page image
+is sent to the VL model for OCR. All local — zero PaddlePaddle deps.
 """
 
 from __future__ import annotations
 
+import base64
 import logging
 import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-os.environ.setdefault("PADDLE_PDX_DEVICE", "cpu")
-os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
-os.environ.setdefault("FLAGS_pir_execution_mode", "0")
-
 SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".webp", ".pdf"}
-
-_ocr_engine = None
-
-
-def get_ocr_engine():
-    """Lazy-load PaddleOCR engine (singleton)."""
-    global _ocr_engine
-    if _ocr_engine is None:
-        try:
-            from paddleocr import PaddleOCR
-            _ocr_engine = PaddleOCR(lang="ch", use_angle_cls=True, ocr_version="PP-OCRv4")
-            logger.info("PaddleOCR engine loaded")
-        except Exception as e:
-            logger.error(f"PaddleOCR init failed: {e}")
-            raise
-    return _ocr_engine
 
 
 async def extract_text(file_path: str, dpi: int = 200) -> str:
-    """Extract text from image or PDF. Returns plain text.
+    """Extract text from image or PDF via PaddleOCR-VL Docker service.
 
-    - Images: PaddleOCR directly
-    - PDFs: PyMuPDF renders each page to image → PaddleOCR
+    - Images: base64 encode → VL model
+    - PDFs: PyMuPDF renders each page → VL model per page
     """
     ext = Path(file_path).suffix.lower()
 
@@ -47,20 +28,49 @@ async def extract_text(file_path: str, dpi: int = 200) -> str:
         raise FileNotFoundError(f"File not found: {file_path}")
 
     if ext == ".pdf":
-        return _extract_pdf(file_path, dpi)
+        return await _extract_pdf(file_path, dpi)
 
-    return _extract_image(file_path)
-
-
-def _extract_image(file_path: str) -> str:
-    """Run PaddleOCR on a single image file."""
-    ocr = get_ocr_engine()
-    results = ocr.ocr(file_path)
-    return _parse_results(results)
+    return await _ocr_image(file_path)
 
 
-def _extract_pdf(file_path: str, dpi: int = 200) -> str:
-    """Render PDF pages to images, OCR each page, concatenate results."""
+def _encode_image(file_path: str) -> tuple[str, str]:
+    """Read image file and return (base64_string, mime_type)."""
+    ext = os.path.splitext(file_path)[1].lower()
+    mime_map = {
+        ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".bmp": "image/bmp", ".tiff": "image/tiff", ".tif": "image/tiff",
+        ".webp": "image/webp",
+    }
+    mime = mime_map.get(ext, "application/octet-stream")
+    with open(file_path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    return b64, mime
+
+
+async def _ocr_image(file_path: str) -> str:
+    """Send a single image to PaddleOCR-VL for OCR."""
+    from app.config import OCR_ENABLED, OCR_MODEL, OCR_SERVER_URL
+    if not OCR_ENABLED:
+        return ""
+
+    b64, mime = _encode_image(file_path)
+    from app.llm.client import LLMClient
+    client = LLMClient(OCR_SERVER_URL, "not-needed", OCR_MODEL)
+
+    resp = await client.async_client.chat.completions.create(
+        model=OCR_MODEL,
+        messages=[{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+            {"type": "text", "text": "OCR: Extract all text. Output as Markdown."},
+        ]}],
+        temperature=0.0,
+        max_tokens=4096,
+    )
+    return resp.choices[0].message.content or ""
+
+
+async def _extract_pdf(file_path: str, dpi: int = 200) -> str:
+    """Render PDF pages to images, OCR each page via VL, concatenate results."""
     try:
         import fitz  # PyMuPDF
     except ImportError:
@@ -69,19 +79,16 @@ def _extract_pdf(file_path: str, dpi: int = 200) -> str:
 
     doc = fitz.open(file_path)
     all_lines: list[str] = []
-    ocr = get_ocr_engine()
 
     for page_num in range(doc.page_count):
         page = doc[page_num]
-        # Render page to pixmap (RGB)
         mat = fitz.Matrix(dpi / 72, dpi / 72)
         pix = page.get_pixmap(matrix=mat)
         img_path = f"{file_path}_page_{page_num}.png"
 
         try:
             pix.save(img_path)
-            result = ocr.ocr(img_path)
-            text = _parse_results(result)
+            text = await _ocr_image(img_path)
             if text.strip():
                 all_lines.append(f"## Page {page_num + 1}\n\n{text}")
         finally:
@@ -92,23 +99,6 @@ def _extract_pdf(file_path: str, dpi: int = 200) -> str:
     return "\n\n".join(all_lines)
 
 
-def _parse_results(results) -> str:
-    """Parse PaddleOCR results into text lines."""
-    if not results:
-        return ""
-
-    lines: list[str] = []
-    for page in results:
-        if hasattr(page, "json"):
-            data = page.json
-            res = data.get("res", data)
-            rec_texts = res.get("rec_texts", [])
-            if isinstance(rec_texts, list):
-                for text in rec_texts:
-                    if isinstance(text, str) and text.strip():
-                        lines.append(text.strip())
-                    elif isinstance(text, list):
-                        for t in text:
-                            if isinstance(t, str) and t.strip():
-                                lines.append(t.strip())
-    return "\n".join(lines)
+def get_ocr_engine():
+    """No local engine — always returns None. OCR goes through Docker VL."""
+    return None
