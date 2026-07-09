@@ -20,6 +20,7 @@ from app.core.event_bus import (
     done_event,
     error_event,
     format_sse,
+    heartbeat,
     token_event,
     tool_call_event,
     tool_result_event,
@@ -224,8 +225,22 @@ async def agent_chat(request: Request, body: AgentChatRequest) -> StreamingRespo
     if not OBSIDIAN_VAULT_PATH:
         raise HTTPException(status_code=400, detail="Vault path not configured")
 
+    async def stream_with_heartbeat() -> AsyncGenerator[str, None]:
+        """Wrap agent loop with periodic heartbeat to keep SSE alive."""
+        gen = _agent_loop(body.content, body.conversation, request)
+        while True:
+            try:
+                next_val = await asyncio.wait_for(gen.__anext__(), timeout=15)
+                yield next_val
+            except asyncio.TimeoutError:
+                if await request.is_disconnected():
+                    return
+                yield heartbeat()
+            except StopAsyncIteration:
+                return
+
     return StreamingResponse(
-        _agent_loop(body.content, body.conversation, request),
+        stream_with_heartbeat(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

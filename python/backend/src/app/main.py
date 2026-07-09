@@ -11,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.agent import router as agent_router
 from app.api.chat import router as chat_router
+from app.api.evolution import router as evolution_router
+from app.api.export import router as export_router
 from app.api.feedback import router as feedback_router
 from app.api.graph import router as graph_router
 from app.api.health import router as health_router
@@ -129,6 +131,8 @@ app.include_router(agent_router)
 app.include_router(upload_router)
 app.include_router(feedback_router)
 app.include_router(graph_router)
+app.include_router(export_router)
+app.include_router(evolution_router)
 
 
 @app.get("/")
