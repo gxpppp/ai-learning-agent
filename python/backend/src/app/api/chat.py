@@ -62,6 +62,8 @@ async def _stream_chat(
                 yield ": heartbeat\n\n"
                 last_keepalive = now
 
+            if not chunk.choices:
+                continue
             delta = chunk.choices[0].delta  # type: ignore[union-attr]
             if getattr(delta, "reasoning_content", None):
                 payload = json.dumps({"content": delta.reasoning_content}, ensure_ascii=False)  # type: ignore[union-attr]
