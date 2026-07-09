@@ -81,6 +81,7 @@ class ReadNoteTool(_VaultTool):
 
 class ListFolderInput(BaseModel):
     path: str = Field(default="", description="Folder path relative to vault root")
+    folder: str = Field(default="", description="Folder path alias")
     folder_path: str = Field(default="", description="Folder path alias")
     dir_path: str = Field(default="", description="Folder path alias")
 
@@ -92,7 +93,7 @@ class ListFolderTool(_VaultTool):
 
     async def _do_execute(self, args: ListFolderInput, vault_path: str, ctx: ToolExecutionContext) -> str:
         from app.core.tool_registry import execute_tool
-        p = args.path or args.folder_path or args.dir_path
+        p = args.path or args.folder or args.folder_path or args.dir_path
         return await execute_tool("list_folder", {"path": p}, vault_path)
 
 
@@ -186,6 +187,7 @@ class DeleteNoteTool(_VaultTool):
 
 class CreateFolderInput(BaseModel):
     path: str = Field(default="", description="Folder path relative to vault root")
+    folder: str = Field(default="", description="Folder path alias")
     folder_path: str = Field(default="", description="Folder path alias")
     dir_path: str = Field(default="", description="Folder path alias")
 
@@ -197,7 +199,7 @@ class CreateFolderTool(_VaultTool):
 
     async def _do_execute(self, args: CreateFolderInput, vault_path: str, ctx: ToolExecutionContext) -> str:
         from app.core.tool_registry import execute_tool
-        p = args.path or args.folder_path or args.dir_path
+        p = args.path or args.folder or args.folder_path or args.dir_path
         return await execute_tool("create_folder", {"path": p}, vault_path)
 
 

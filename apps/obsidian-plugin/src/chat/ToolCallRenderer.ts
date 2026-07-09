@@ -127,6 +127,34 @@ export class ToolCallRenderer {
     }
   }
 
+  /** Render the LLM's JSON plan as a collapsible block. */
+  renderToolPlan(planJson: string): void {
+    const card = this.container.createDiv({ cls: "ai-tool-card ai-tool-plan" });
+    const header = card.createDiv({ cls: "ai-tool-header" });
+    header.createSpan({ cls: "ai-tool-icon", text: "📋" });
+    header.createSpan({ cls: "ai-tool-name", text: "Plan" });
+
+    const body = card.createDiv({ cls: "ai-tool-body" });
+    try {
+      const plan = JSON.parse(planJson);
+      const list = body.createEl("ul", { cls: "ai-tool-plan-list" });
+      for (const action of plan) {
+        const tool = action.tool || "unknown";
+        const args = action.args ? JSON.stringify(action.args) : "";
+        list.createEl("li", {
+          text: `${tool}(${args.slice(0, 80)}${args.length > 80 ? "..." : ""})`,
+        });
+      }
+    } catch {
+      body.createEl("pre", { text: planJson.slice(0, 300) });
+    }
+    // Auto-collapse after 2s
+    setTimeout(() => body.style.display = "none", 3000);
+    header.addEventListener("click", () => {
+      body.style.display = body.style.display === "none" ? "block" : "none";
+    });
+  }
+
   /** Render a sub-agent status marker in the message stream. */
   renderAgentMarker(agent: string, phase: "start" | "end", task?: string): void {
     const el = this.container.createDiv({ cls: "ai-tool-card ai-agent-marker" });

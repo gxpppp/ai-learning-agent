@@ -153,36 +153,47 @@ async def _agent_loop(
 
     client = _llm_mgr.llm_manager.get_chat_client(ACTIVE_PROVIDER_ID, ACTIVE_CHAT_MODEL)
 
+    # ── Stream LLM response token-by-token ──
+    full_text = ""
     try:
-        response = await client.async_client.chat.completions.create(
+        stream_resp = await client.async_client.chat.completions.create(
             model=ACTIVE_CHAT_MODEL,
             messages=messages,  # type: ignore[arg-type]
             temperature=0.7,
-            stream=False,
+            stream=True,
         )  # type: ignore[call-overload]
+
+        async for chunk in stream_resp:  # type: ignore[union-attr]
+            if await request.is_disconnected():
+                return
+            delta = chunk.choices[0].delta if chunk.choices else None  # type: ignore[union-attr]
+            if not delta:
+                continue
+
+            # Reasoning content (DeepSeek thinking)
+            reasoning = getattr(delta, "reasoning_content", None)  # type: ignore[union-attr]
+            if reasoning:
+                yield format_sse("thinking", {"content": reasoning})
+
+            # Normal text content
+            if delta.content:
+                full_text += delta.content
+                yield token_event(delta.content)
+
     except Exception as exc:
-        logger.exception("Agent LLM call failed")
+        logger.exception("Agent LLM stream failed")
         yield error_event(str(exc))
         return
 
     if await request.is_disconnected():
         return
 
-    choice = response.choices[0]  # type: ignore[union-attr]
-    msg = choice.message
-
-    if getattr(msg, "reasoning_content", None):
-        yield format_sse("thinking", {"content": msg.reasoning_content})  # type: ignore[union-attr]
-
-    full_text = msg.content or ""
-
+    # ── Parse JSON action plan from full response ──
     actions = _parse_actions(full_text)
 
     if actions:
-        visible_text = _strip_json_blocks(full_text).strip()
-        if visible_text:
-            yield token_event(visible_text)
-            yield token_event("\n\n")
+        yield token_event("\n")
+        yield format_sse("tool_plan", {"plan": json.dumps(actions, ensure_ascii=False)})
 
         for i, action in enumerate(actions):
             tool_name = action.get("tool", "")
@@ -215,11 +226,6 @@ def _parse_actions(text: str) -> list[dict[str, Any]]:
         except json.JSONDecodeError:
             continue
     return []
-
-
-def _strip_json_blocks(text: str) -> str:
-    """Remove JSON code fences from text for display."""
-    return re.sub(r"```(?:json)?\s*\n?.*?\n?```", "", text, flags=re.DOTALL)
 
 
 class AgentChatRequest(BaseModel):

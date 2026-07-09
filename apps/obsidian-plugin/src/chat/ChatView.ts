@@ -217,6 +217,9 @@ export class ChatView extends ItemView {
           } else if (eventType === "tool_call") {
             toolRenderer.renderToolCall(parsed);
             this.scrollToBottomIfDesired();
+          } else if (eventType === "tool_plan") {
+            toolRenderer.renderToolPlan(parsed.plan || JSON.stringify(parsed));
+            this.scrollToBottomIfDesired();
           } else if (eventType === "tool_result") {
             await toolRenderer.renderToolResult(parsed, this.app, this);
             this.scrollToBottomIfDesired();

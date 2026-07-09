@@ -341,7 +341,7 @@ def _read_note(args: dict, vault_path: str) -> str:
 
 
 def _list_folder(args: dict, vault_path: str) -> str:
-    p = _arg(args, "path", "folder_path", "dir_path")
+    p = _arg(args, "path", "folder", "folder_path", "dir_path")
     full = _safe_path(vault_path, p)
     if not os.path.isdir(full):
         return json.dumps({"error": f"Folder not found: {p}"})
@@ -436,7 +436,7 @@ def _delete_note(args: dict, vault_path: str) -> str:
 
 
 def _create_folder(args: dict, vault_path: str) -> str:
-    p = _arg(args, "path", "folder_path", "dir_path")
+    p = _arg(args, "path", "folder", "folder_path", "dir_path")
     if not p:
         return json.dumps({"error": "Missing path"})
     full = _safe_path(vault_path, p)
