@@ -36,9 +36,14 @@ from app.config import (
     RAG_ENABLED,
     VERSION,
 )
+from app.core.logging import setup_logging
 
 logging.basicConfig(level=logging.INFO, format="[%(name)s] %(message)s")
 logger = logging.getLogger("server")
+
+# Setup structured file logging to .ai-tutor/logs/
+if OBSIDIAN_VAULT_PATH:
+    setup_logging(os.path.join(OBSIDIAN_VAULT_PATH, ".ai-tutor", "logs"))
 
 embedding_client = None
 vector_store = None

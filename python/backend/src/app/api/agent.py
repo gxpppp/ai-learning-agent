@@ -25,9 +25,12 @@ from app.core.event_bus import (
     tool_call_event,
     tool_result_event,
 )
+from app.core.logging import new_trace_id
 from app.core.tool_registry import execute_tool
 
 logger = logging.getLogger(__name__)
+
+tracer = logging.getLogger("agent")
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
@@ -66,6 +69,10 @@ async def _agent_loop(
     conversation: list[dict[str, Any]],
     request: Request,
 ) -> AsyncGenerator[str, None]:
+    trace_id = new_trace_id()
+    tracer.info("request", extra={"trace_id": trace_id,
+        "msg": user_message[:100], "vault": OBSIDIAN_VAULT_PATH[:50]})
+
     if not _llm_mgr.llm_manager:
         yield error_event("LLM Manager not initialized")
         return

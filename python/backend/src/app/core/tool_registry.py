@@ -7,9 +7,12 @@ The active permission mode determines which tools are registered.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger("tool")
 
 READONLY_TOOLS = [
     {
@@ -226,8 +229,12 @@ async def execute_tool(
     name: str,
     args: dict[str, Any],
     vault_path: str,
+    trace_id: str = "",
 ) -> str:
     """Execute a tool call and return the result as a string."""
+    import time
+
+    t0 = time.time()
     try:
         if name == "search_notes":
             return await _search_notes(args, vault_path)
@@ -259,16 +266,47 @@ async def execute_tool(
             return _get_vault_status(vault_path)
         return json.dumps({"error": f"Unknown tool: {name}"})
     except Exception as exc:
+        import traceback
+        logger.warning("tool error", extra={
+            "trace_id": trace_id, "tool": name,
+            "ms": int((time.time() - t0) * 1000),
+            "error": str(exc),
+        })
+        logger.debug("traceback", extra={"trace_id": trace_id, "tb": traceback.format_exc()[-500:]})
         return json.dumps({"error": str(exc)})
+    finally:
+        ms = int((time.time() - t0) * 1000)
+        logger.info("tool done", extra={
+            "trace_id": trace_id, "tool": name,
+            "ms": ms, "vault": vault_path[:40],
+        })
 
 
-# ─── Tool Implementations ───────────────────────────────────
+# ─── Helpers ─────────────────────────────────────────────
 
 def _safe_path(vault_path: str, rel_path: str) -> str:
     full = os.path.normpath(os.path.join(vault_path, rel_path))
     if not full.startswith(os.path.normpath(vault_path)):
         raise ValueError("Path traversal denied")
     return full
+
+
+def _arg(args: dict, *keys: str, default: Any = "") -> Any:
+    """Get first matching key from args (LLM may use different param names)."""
+    for k in keys:
+        if k in args and args[k]:
+            return args[k]
+    return default
+
+
+def _is_binary(file_path: str) -> bool:
+    """Quick check if file is binary (PDF/image/archive)."""
+    try:
+        with open(file_path, "rb") as f:
+            head = f.read(2048)
+        return b"\x00" in head
+    except OSError:
+        return False
 
 
 async def _search_notes(args: dict, vault_path: str) -> str:
@@ -289,19 +327,24 @@ async def _search_notes(args: dict, vault_path: str) -> str:
 
 
 def _read_note(args: dict, vault_path: str) -> str:
-    full = _safe_path(vault_path, args["note_path"])
+    note_path = _arg(args, "note_path", "file_path", "path")
+    if not note_path:
+        return json.dumps({"error": "Missing note_path"})
+    full = _safe_path(vault_path, note_path)
     if not os.path.exists(full):
-        return json.dumps({"error": "File not found"})
+        return json.dumps({"error": f"File not found: {note_path}"})
+    if _is_binary(full):
+        return json.dumps({"error": "Binary file (PDF/image). Use ocr_document tool instead.", "path": note_path})
     with open(full, encoding="utf-8") as f:
         content = f.read()
-    return json.dumps({"path": args["note_path"], "content": content})
+    return json.dumps({"path": note_path, "content": content})
 
 
 def _list_folder(args: dict, vault_path: str) -> str:
-    p = args.get("path", "")
+    p = _arg(args, "path", "folder_path", "dir_path")
     full = _safe_path(vault_path, p)
     if not os.path.isdir(full):
-        return json.dumps({"error": "Folder not found"})
+        return json.dumps({"error": f"Folder not found: {p}"})
     items = []
     with os.scandir(full) as it:
         for entry in sorted(it, key=lambda e: (not e.is_dir(), e.name.lower())):
@@ -338,17 +381,21 @@ def _recommend_links(args: dict, vault_path: str) -> str:
 
 
 def _create_note(args: dict, vault_path: str) -> str:
-    folder = args["folder"]
-    fname = args["filename"]
+    folder = _arg(args, "folder", "folder_path", "dir_path")
+    fname = _arg(args, "filename", "file_name", "name")
+    if not folder and not fname:
+        return json.dumps({"error": "Missing folder or filename"})
     if not fname.endswith(".md"):
         fname += ".md"
-    content = args["content"]
+    content = _arg(args, "content", "text", "body")
+    if not content:
+        return json.dumps({"error": "Missing content"})
     tags = args.get("tags", [])
 
     full_dir = _safe_path(vault_path, folder)
     os.makedirs(full_dir, exist_ok=True)
     full_path = os.path.join(full_dir, fname)
-    _safe_path(vault_path, os.path.join(folder, fname))  # validate
+    _safe_path(vault_path, os.path.join(folder, fname))
 
     frontmatter = ""
     if tags:
@@ -362,37 +409,51 @@ def _create_note(args: dict, vault_path: str) -> str:
 
 
 def _update_note(args: dict, vault_path: str) -> str:
-    full = _safe_path(vault_path, args["note_path"])
+    note_path = _arg(args, "note_path", "file_path", "path")
+    content = _arg(args, "content", "text", "body")
+    if not note_path:
+        return json.dumps({"error": "Missing note_path"})
+    full = _safe_path(vault_path, note_path)
     if not os.path.exists(full):
-        return json.dumps({"error": "File not found"})
+        return json.dumps({"error": f"File not found: {note_path}"})
     with open(full, "w", encoding="utf-8") as f:
-        f.write(args["content"])
-    return json.dumps({"updated": args["note_path"]})
+        f.write(content)
+    return json.dumps({"updated": note_path})
 
 
 def _delete_note(args: dict, vault_path: str) -> str:
-    full = _safe_path(vault_path, args["note_path"])
+    note_path = _arg(args, "note_path", "file_path", "path")
+    if not note_path:
+        return json.dumps({"error": "Missing note_path"})
+    full = _safe_path(vault_path, note_path)
     if not os.path.exists(full):
-        return json.dumps({"error": "File not found"})
+        return json.dumps({"error": f"File not found: {note_path}"})
     trash_dir = os.path.join(vault_path, ".trash")
     os.makedirs(trash_dir, exist_ok=True)
-    dest = os.path.join(trash_dir, os.path.basename(args["note_path"]))
+    dest = os.path.join(trash_dir, os.path.basename(note_path))
     os.rename(full, dest)
-    return json.dumps({"deleted": args["note_path"], "moved_to": ".trash/"})
+    return json.dumps({"deleted": note_path, "moved_to": ".trash/"})
 
 
 def _create_folder(args: dict, vault_path: str) -> str:
-    full = _safe_path(vault_path, args["path"])
+    p = _arg(args, "path", "folder_path", "dir_path")
+    if not p:
+        return json.dumps({"error": "Missing path"})
+    full = _safe_path(vault_path, p)
     os.makedirs(full, exist_ok=True)
-    return json.dumps({"created_folder": args["path"]})
+    return json.dumps({"created_folder": p})
 
 
 def _move_note(args: dict, vault_path: str) -> str:
-    src = _safe_path(vault_path, args["source"])
-    dst = _safe_path(vault_path, args["destination"])
+    source = _arg(args, "source", "source_path", "from")
+    dest = _arg(args, "destination", "dest_path", "to")
+    if not source or not dest:
+        return json.dumps({"error": "Missing source or destination"})
+    src = _safe_path(vault_path, source)
+    dst = _safe_path(vault_path, dest)
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     os.rename(src, dst)
-    return json.dumps({"moved": args["source"], "to": args["destination"]})
+    return json.dumps({"moved": source, "to": dest})
 
 
 async def _ocr_document(args: dict, vault_path: str) -> str:
@@ -427,7 +488,8 @@ async def _ocr_document(args: dict, vault_path: str) -> str:
 
 
 def _classify_note(args: dict, vault_path: str) -> str:
-    full = _safe_path(vault_path, args["note_path"])
+    note_path = _arg(args, "note_path", "file_path", "path")
+    full = _safe_path(vault_path, note_path)
     if not os.path.exists(full):
         return json.dumps({"error": "File not found"})
     with open(full, encoding="utf-8") as f:
@@ -447,14 +509,15 @@ def _classify_note(args: dict, vault_path: str) -> str:
         category = "study-note"
     else:
         category = "general"
-    return json.dumps({"path": args["note_path"], "category": category, "length": length})
+    return json.dumps({"path": note_path, "category": category, "length": length})
 
 
 async def _generate_summary(args: dict, vault_path: str) -> str:
     import app.llm.manager as _lmm
     from app.config import ACTIVE_CHAT_MODEL, ACTIVE_PROVIDER_ID
 
-    full = _safe_path(vault_path, args["note_path"])
+    note_path = _arg(args, "note_path", "file_path", "path")
+    full = _safe_path(vault_path, note_path)
     if not os.path.exists(full):
         return json.dumps({"error": "File not found"})
     with open(full, encoding="utf-8") as f:
@@ -477,7 +540,7 @@ async def _generate_summary(args: dict, vault_path: str) -> str:
     new_content = content.rstrip() + f"\n\n> **TL;DR:** {summary}\n"
     with open(full, "w", encoding="utf-8") as f:
         f.write(new_content)
-    return json.dumps({"summarized": args["note_path"], "summary": summary[:200]})
+    return json.dumps({"summarized": note_path, "summary": summary[:200]})
 
 
 def _get_vault_status(vault_path: str) -> str:

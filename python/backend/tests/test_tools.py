@@ -103,4 +103,4 @@ async def test_tool_file_not_found(vault_dir: str):
     from app.core.tool_registry import _read_note
     result = _read_note({"note_path": "nope.md"}, vault_dir)
     data = json.loads(result)
-    assert data["error"] == "File not found"
+    assert "File not found" in data["error"]

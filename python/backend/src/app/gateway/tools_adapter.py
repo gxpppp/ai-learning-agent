@@ -63,7 +63,9 @@ class SearchNotesTool(_VaultTool):
 
 
 class ReadNoteInput(BaseModel):
-    note_path: str = Field(description="Path to the note relative to vault root")
+    note_path: str = Field(default="", description="Path to the note relative to vault root")
+    file_path: str = Field(default="", description="Path alias")
+    path: str = Field(default="", description="Path alias")
 
 
 class ReadNoteTool(_VaultTool):
@@ -73,11 +75,14 @@ class ReadNoteTool(_VaultTool):
 
     async def _do_execute(self, args: ReadNoteInput, vault_path: str, ctx: ToolExecutionContext) -> str:
         from app.core.tool_registry import execute_tool
-        return await execute_tool("read_note", {"note_path": args.note_path}, vault_path)
+        p = args.note_path or args.file_path or args.path
+        return await execute_tool("read_note", {"note_path": p}, vault_path)
 
 
 class ListFolderInput(BaseModel):
     path: str = Field(default="", description="Folder path relative to vault root")
+    folder_path: str = Field(default="", description="Folder path alias")
+    dir_path: str = Field(default="", description="Folder path alias")
 
 
 class ListFolderTool(_VaultTool):
@@ -87,7 +92,8 @@ class ListFolderTool(_VaultTool):
 
     async def _do_execute(self, args: ListFolderInput, vault_path: str, ctx: ToolExecutionContext) -> str:
         from app.core.tool_registry import execute_tool
-        return await execute_tool("list_folder", {"path": args.path}, vault_path)
+        p = args.path or args.folder_path or args.dir_path
+        return await execute_tool("list_folder", {"path": p}, vault_path)
 
 
 class SuggestTagsInput(BaseModel):
@@ -124,9 +130,13 @@ class RecommendLinksTool(_VaultTool):
 
 
 class CreateNoteInput(BaseModel):
-    folder: str = Field(description="Target folder relative to vault root")
-    filename: str = Field(description="Filename with .md extension")
-    content: str = Field(description="Markdown content")
+    folder: str = Field(default="", description="Target folder relative to vault root")
+    folder_path: str = Field(default="", description="Folder alias")
+    filename: str = Field(default="", description="Filename with .md extension")
+    file_name: str = Field(default="", description="Filename alias")
+    content: str = Field(default="", description="Markdown content")
+    text: str = Field(default="", description="Content alias")
+    body: str = Field(default="", description="Content alias")
     tags: list[str] = Field(default_factory=list, description="Frontmatter tags")
 
 
@@ -138,8 +148,10 @@ class CreateNoteTool(_VaultTool):
     async def _do_execute(self, args: CreateNoteInput, vault_path: str, ctx: ToolExecutionContext) -> str:
         from app.core.tool_registry import execute_tool
         return await execute_tool("create_note", {
-            "folder": args.folder, "filename": args.filename,
-            "content": args.content, "tags": args.tags,
+            "folder": args.folder or args.folder_path,
+            "filename": args.filename or args.file_name,
+            "content": args.content or args.text or args.body,
+            "tags": args.tags,
         }, vault_path)
 
 
@@ -173,7 +185,9 @@ class DeleteNoteTool(_VaultTool):
 
 
 class CreateFolderInput(BaseModel):
-    path: str = Field(description="Folder path relative to vault root")
+    path: str = Field(default="", description="Folder path relative to vault root")
+    folder_path: str = Field(default="", description="Folder path alias")
+    dir_path: str = Field(default="", description="Folder path alias")
 
 
 class CreateFolderTool(_VaultTool):
@@ -183,7 +197,8 @@ class CreateFolderTool(_VaultTool):
 
     async def _do_execute(self, args: CreateFolderInput, vault_path: str, ctx: ToolExecutionContext) -> str:
         from app.core.tool_registry import execute_tool
-        return await execute_tool("create_folder", {"path": args.path}, vault_path)
+        p = args.path or args.folder_path or args.dir_path
+        return await execute_tool("create_folder", {"path": p}, vault_path)
 
 
 class MoveNoteInput(BaseModel):
