@@ -217,6 +217,12 @@ export class ChatView extends ItemView {
           } else if (eventType === "tool_result") {
             await toolRenderer.renderToolResult(parsed, this.app, this);
             this.scrollToBottomIfDesired();
+          } else if (eventType === "agent_start") {
+            toolRenderer.renderAgentMarker(parsed.agent, "start", parsed.task);
+            this.scrollToBottomIfDesired();
+          } else if (eventType === "agent_end") {
+            toolRenderer.renderAgentMarker(parsed.agent, "end");
+            this.scrollToBottomIfDesired();
           }
         } catch { /* skip */ }
       }

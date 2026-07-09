@@ -126,4 +126,20 @@ export class ToolCallRenderer {
         return raw.slice(0, 300);
     }
   }
+
+  /** Render a sub-agent status marker in the message stream. */
+  renderAgentMarker(agent: string, phase: "start" | "end", task?: string): void {
+    const el = this.container.createDiv({ cls: "ai-tool-card ai-agent-marker" });
+    const icons: Record<string, string> = {
+      orchestrator: "🧩",
+      searcher: "🔍",
+      operator: "⚙️",
+      verifier: "✅",
+    };
+    const icon = icons[agent] || "🤖";
+    const label = phase === "start"
+      ? `${icon} ${agent} started` + (task ? `: ${task.slice(0, 60)}` : "")
+      : `${icon} ${agent} done`;
+    el.createSpan({ cls: "ai-tool-name", text: label });
+  }
 }

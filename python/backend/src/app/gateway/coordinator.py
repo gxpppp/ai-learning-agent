@@ -18,7 +18,7 @@ from openharness.engine.stream_events import (
     ToolExecutionStarted,
 )
 from openharness.permissions.checker import PermissionChecker
-from openharness.permissions.types import PermissionMode
+from openharness.permissions import PermissionMode
 
 logger = logging.getLogger(__name__)
 

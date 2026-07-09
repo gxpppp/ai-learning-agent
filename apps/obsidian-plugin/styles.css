@@ -518,3 +518,13 @@
   z-index: 1000;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
+
+/* Agent status marker */
+.ai-agent-marker {
+  font-size: 0.8em;
+  background: var(--background-primary-alt);
+  border-left: 3px solid var(--text-accent);
+  padding: 4px 10px;
+  margin: 4px 0;
+  opacity: 0.85;
+}
