@@ -38,6 +38,7 @@ class GatewayCoordinator:
         system_prompt: str,
         provider_id: str,
         model: str,
+        conversation: list[dict[str, Any]] | None = None,
     ) -> AsyncGenerator[str, None]:
         """Execute a task using OpenHarness QueryEngine.
 
@@ -48,6 +49,7 @@ class GatewayCoordinator:
         from app.core.event_bus import done_event, error_event
         from app.gateway.tools_adapter import create_vault_tool_registry
         from openharness.api import OpenAICompatibleClient
+        from openharness.engine.messages import ConversationMessage, TextBlock
 
         if not _llm_mgr.llm_manager:
             yield error_event("LLM Manager not initialized")
@@ -64,10 +66,10 @@ class GatewayCoordinator:
             base_url=provider.get("baseUrl", "https://api.deepseek.com/v1"),
         )
 
-        # Build tool registry with all 15 vault tools
+        # Build tool registry with all vault tools
         tool_registry = create_vault_tool_registry()
 
-        # Auto-approve all tool calls (permissions managed at caller level)
+        # Auto-approve all tool calls
         perm_settings = PermissionSettings(mode=PermissionMode.FULL_AUTO)
         perm_checker = PermissionChecker(perm_settings)
 
@@ -81,6 +83,21 @@ class GatewayCoordinator:
             system_prompt=system_prompt,
             max_turns=8,
         )
+
+        # Load conversation history if provided
+        if conversation:
+            history_msgs: list[ConversationMessage] = []
+            for m in conversation:
+                role = m.get("role", "user")
+                content = m.get("content", "")
+                if role == "user":
+                    history_msgs.append(ConversationMessage.from_user_text(content))
+                elif role == "assistant":
+                    history_msgs.append(ConversationMessage(
+                        role="assistant",
+                        content=[TextBlock(text=content, type="text")],
+                    ))
+            engine.load_messages(history_msgs)
 
         # Run the agent loop and stream results as SSE
         try:

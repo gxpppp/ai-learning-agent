@@ -1,11 +1,9 @@
-"""Agent chat endpoint — routes simple tasks to JSON plan parser, complex to Gateway."""
+"""Agent chat endpoint — all requests through OpenHarness QueryEngine for interleaved text+tool execution."""
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import re
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -15,53 +13,17 @@ from pydantic import BaseModel
 
 import app.llm.manager as _llm_mgr
 from app.config import ACTIVE_CHAT_MODEL, ACTIVE_PROVIDER_ID, OBSIDIAN_VAULT_PATH, TOOL_PERMISSIONS
-from app.core.dispatcher import TaskComplexity, classify
 from app.core.event_bus import (
     done_event,
     error_event,
-    format_sse,
     heartbeat,
-    token_event,
-    tool_call_event,
-    tool_result_event,
 )
 from app.core.logging import new_trace_id
-from app.core.tool_registry import execute_tool
 
 logger = logging.getLogger(__name__)
-
 tracer = logging.getLogger("agent")
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
-
-AGENT_PROMPT = """You are an AI learning assistant with full control over the user's Obsidian vault.
-
-Available tools:
-
-{tools_list}
-
-When the user asks you to do something, first explain your plan briefly,
-then output a JSON action block wrapped in ```json fences:
-
-```json
-{{
-  "actions": [
-    {{"tool": "read_note", "args": {{"note_path": "Notes/example.md"}}}},
-    {{"tool": "create_note", "args": {{"folder": "Output", "filename": "summary.md", "content": "..."}}}}
-  ],
-  "summary": "Brief explanation of what you'll do"
-}}
-```
-
-Rules:
-- Use the right tools in the right order
-- Only use tools listed above
-- For simple chats that need no tools, just reply normally — no JSON needed
-- After executing actions, summarize what was done
-
-The vault is at: {vault_path}
-Permission mode: {permission_mode}
-"""
 
 
 async def _agent_loop(
@@ -70,162 +32,50 @@ async def _agent_loop(
     request: Request,
 ) -> AsyncGenerator[str, None]:
     trace_id = new_trace_id()
-    tracer.info("request", extra={"trace_id": trace_id,
-        "input": user_message[:100], "vault": OBSIDIAN_VAULT_PATH[:50]})
+    tracer.info("request", extra={
+        "trace_id": trace_id,
+        "input": user_message[:100],
+        "vault": OBSIDIAN_VAULT_PATH[:50],
+    })
 
     if not _llm_mgr.llm_manager:
         yield error_event("LLM Manager not initialized")
         return
 
-    # ── Gateway routing ──
-    complexity = classify(user_message)
-
-    if complexity == TaskComplexity.SEARCH:
-        from app.gateway.router import route
-        async for event in route(user_message, OBSIDIAN_VAULT_PATH, conversation):
-            if await request.is_disconnected():
-                return
-            yield event
-        yield done_event()
-        return
-
-    if complexity == TaskComplexity.COMPLEX:
-        # Use OpenHarness-powered gateway coordinator
-        from app.gateway.coordinator import GatewayCoordinator
-        from app.gateway.router import route as gateway_route
-
-        # First, let the router set up context (agent_start etc.)
-        async for event in gateway_route(user_message, OBSIDIAN_VAULT_PATH, conversation):
-            if await request.is_disconnected():
-                return
-            yield event
-
-        # Then, use OpenHarness engine for the actual work
-        coordinator = GatewayCoordinator(
-            vault_path=OBSIDIAN_VAULT_PATH,
-            permission_mode=TOOL_PERMISSIONS,
-        )
-
-        # Build system prompt with tool list
-        from app.core.tool_registry import get_tools
-        tools = get_tools(TOOL_PERMISSIONS)
-        tools_list = "\n".join(
-            f"- **{t['function']['name']}**: {t['function']['description']}"
-            for t in tools
-        )
-        system_prompt = AGENT_PROMPT.format(
-            tools_list=tools_list,
-            vault_path=OBSIDIAN_VAULT_PATH,
-            permission_mode=TOOL_PERMISSIONS,
-        )
-
-        async for event in coordinator.execute(
-            user_message=user_message,
-            system_prompt=system_prompt,
-            provider_id=ACTIVE_PROVIDER_ID,
-            model=ACTIVE_CHAT_MODEL,
-        ):
-            if await request.is_disconnected():
-                return
-            yield event
-        return
-
-    # ── Simple path: JSON action plan ──
+    # Build system prompt describing available tools
     from app.core.tool_registry import get_tools
-
     tools = get_tools(TOOL_PERMISSIONS)
     tools_list = "\n".join(
         f"- **{t['function']['name']}**: {t['function']['description']}"
         for t in tools
     )
+    system_prompt = (
+        "You are an AI assistant with direct control over the user's Obsidian vault.\n\n"
+        "Available tools:\n\n"
+        f"{tools_list}\n\n"
+        "Use tools directly when you need to. Explain what you are doing as you go.\n"
+        "Call tools while you talk — do not wait until the end.\n"
+        f"The vault is at: {OBSIDIAN_VAULT_PATH}\n"
+        f"Permission mode: {TOOL_PERMISSIONS}\n"
+    )
 
-    system_prompt = AGENT_PROMPT.format(
-        tools_list=tools_list,
+    # All requests through OpenHarness engine (interleaved text + tools)
+    from app.gateway.coordinator import GatewayCoordinator
+    coordinator = GatewayCoordinator(
         vault_path=OBSIDIAN_VAULT_PATH,
         permission_mode=TOOL_PERMISSIONS,
     )
 
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": system_prompt},
-        *conversation,
-        {"role": "user", "content": user_message},
-    ]
-
-    client = _llm_mgr.llm_manager.get_chat_client(ACTIVE_PROVIDER_ID, ACTIVE_CHAT_MODEL)
-
-    # ── Stream LLM response token-by-token ──
-    full_text = ""
-    try:
-        stream_resp = await client.async_client.chat.completions.create(
-            model=ACTIVE_CHAT_MODEL,
-            messages=messages,  # type: ignore[arg-type]
-            temperature=0.7,
-            stream=True,
-        )  # type: ignore[call-overload]
-
-        async for chunk in stream_resp:  # type: ignore[union-attr]
-            if await request.is_disconnected():
-                return
-            delta = chunk.choices[0].delta if chunk.choices else None  # type: ignore[union-attr]
-            if not delta:
-                continue
-
-            # Reasoning content (DeepSeek thinking)
-            reasoning = getattr(delta, "reasoning_content", None)  # type: ignore[union-attr]
-            if reasoning:
-                yield format_sse("thinking", {"content": reasoning})
-
-            # Normal text content
-            if delta.content:
-                full_text += delta.content
-                yield token_event(delta.content)
-
-    except Exception as exc:
-        logger.exception("Agent LLM stream failed")
-        yield error_event(str(exc))
-        return
-
-    if await request.is_disconnected():
-        return
-
-    # ── Parse JSON action plan from full response ──
-    actions = _parse_actions(full_text)
-
-    if actions:
-        yield token_event("\n")
-        yield format_sse("tool_plan", {"plan": json.dumps(actions, ensure_ascii=False)})
-
-        for i, action in enumerate(actions):
-            tool_name = action.get("tool", "")
-            tool_args = action.get("args", {})
-
-            yield tool_call_event(f"local_{i}", tool_name, tool_args)
-
-            t0 = asyncio.get_event_loop().time()
-            result = await execute_tool(tool_name, tool_args, OBSIDIAN_VAULT_PATH, trace_id=trace_id)
-            elapsed = round((asyncio.get_event_loop().time() - t0) * 1000)
-
-            yield tool_result_event(f"local_{i}", tool_name, result, elapsed)
-
-        yield token_event(f"\nDone \u2014 {len(actions)} action(s) completed.")
-    else:
-        yield token_event(full_text)
-
-    yield done_event()
-
-
-def _parse_actions(text: str) -> list[dict[str, Any]]:
-    """Extract JSON action plan from LLM response."""
-    matches = re.findall(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
-    for match in matches:
-        try:
-            data = json.loads(match.strip())
-            actions = data.get("actions", data.get("plan", []))
-            if isinstance(actions, list) and actions:
-                return actions
-        except json.JSONDecodeError:
-            continue
-    return []
+    async for event in coordinator.execute(
+        user_message=user_message,
+        system_prompt=system_prompt,
+        provider_id=ACTIVE_PROVIDER_ID,
+        model=ACTIVE_CHAT_MODEL,
+        conversation=conversation,
+    ):
+        if await request.is_disconnected():
+            return
+        yield event
 
 
 class AgentChatRequest(BaseModel):
@@ -239,7 +89,6 @@ async def agent_chat(request: Request, body: AgentChatRequest) -> StreamingRespo
         raise HTTPException(status_code=400, detail="Vault path not configured")
 
     async def stream_with_heartbeat() -> AsyncGenerator[str, None]:
-        """Wrap agent loop with periodic heartbeat to keep SSE alive."""
         gen = _agent_loop(body.content, body.conversation, request)
         while True:
             try:

@@ -51,6 +51,13 @@ export class ToolCallRenderer {
     const card = this.container.createDiv({ cls: "ai-tool-call-card" });
     card.setAttribute("data-tool-id", data.id);
 
+    // Color-coded by tool type
+    const writeTools = ["create_note","update_note","delete_note","create_folder","move_note","ocr_document","index_note","generate_summary"];
+    const searchTools = ["search_notes","read_note","list_folder","suggest_tags","recommend_links","web_search","get_vault_status","classify_note"];
+    card.setAttribute("data-tool-type",
+        writeTools.includes(data.name) ? "write" :
+        searchTools.includes(data.name) ? "search" : "other");
+
     const header = card.createDiv({ cls: "ai-tool-call-header" });
     header.createSpan({ cls: "ai-tool-call-icon", text: icon });
     header.createSpan({ cls: "ai-tool-call-name", text: ` ${data.name}` });

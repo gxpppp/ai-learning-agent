@@ -64,7 +64,7 @@ async def _ocr_image(file_path: str) -> str:
             {"type": "text", "text": "OCR: Extract all text. Output as Markdown."},
         ]}],
         temperature=0.0,
-        max_tokens=4096,
+        max_tokens=2048,
     )
     return resp.choices[0].message.content or ""
 

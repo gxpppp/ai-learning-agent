@@ -1,11 +1,17 @@
 services:
   paddleocr-vl:
-    image: ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-genai-vllm-server:latest-nvidia-gpu
-    command: paddleocr genai_server --model_name PaddleOCR-VL-0.9B --host 0.0.0.0 --port 8080 --backend vllm
+    image: ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlex-genai-vllm-server:latest
+    command: paddlex_genai_server --model_name PaddleOCR-VL-0.9B --host 0.0.0.0 --port 8080 --backend vllm --backend_config /opt/vllm_config.yaml
+    environment:
+      - PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+      - VLLM_WORKER_MULTIPROC_METHOD=spawn
+      - NCCL_P2P_DISABLE=1
+      - CUDA_LAUNCH_BLOCKING=1
     ports:
       - "8080:8080"
     volumes:
       - F:/ai-models/paddleocr:/root/.paddlex
+      - ./vllm_config.yaml:/opt/vllm_config.yaml
     deploy:
       resources:
         reservations:

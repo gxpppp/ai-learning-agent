@@ -1,0 +1,5 @@
+max-model-len: 4096
+gpu-memory-utilization: 0.35
+enforce-eager: true
+max-num-batched-tokens: 4096
+max-num-seqs: 4

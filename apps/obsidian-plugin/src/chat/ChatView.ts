@@ -143,6 +143,7 @@ export class ChatView extends ItemView {
     const assistantMsgEl = this.renderer.createMessageContainer("assistant");
     this.messagesEl.appendChild(assistantMsgEl);
     this.renderer.beginStreaming(assistantMsgEl);
+    this.showTypingIndicator(assistantMsgEl);
     this.forceScrollToBottom();
 
     const port = this.plugin.settings.server.port;
@@ -211,6 +212,7 @@ export class ChatView extends ItemView {
             this.renderer.appendThinking(parsed.content);
             this.scrollToBottomIfDesired();
           } else if (eventType === "token" && parsed.content) {
+            this.hideTypingIndicator();
             fullText += parsed.content;
             this.renderer.appendToken(parsed.content);
             this.scrollToBottomIfDesired();
@@ -251,6 +253,18 @@ export class ChatView extends ItemView {
   }
 
   abortStreaming(): void { this.abortController?.abort(); }
+
+  private showTypingIndicator(msgEl: HTMLElement): void {
+    const dots = msgEl.createDiv({ cls: "ai-typing-indicator" });
+    dots.createDiv({ cls: "ai-typing-dot" });
+    dots.createDiv({ cls: "ai-typing-dot" });
+    dots.createDiv({ cls: "ai-typing-dot" });
+  }
+
+  private hideTypingIndicator(): void {
+    const dot = this.messagesEl.querySelector(".ai-typing-indicator");
+    if (dot) dot.remove();
+  }
 
   private showAgentStatus(agent: string, task: string): void {
     this.agentStatusEl.style.display = "block";
