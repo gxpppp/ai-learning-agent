@@ -195,9 +195,11 @@ export class SidecarManager {
   }
 
   private killPortProcess(port: number): boolean {
+    // Use local require to avoid esbuild TDZ on execSync
+    const { execSync: _exec } = require("node:child_process") as typeof import("node:child_process");
     try {
       if (process.platform === "win32") {
-        const out = execSync(
+        const out = _exec(
           `netstat -ano | findstr ":${port}" | findstr "LISTENING"`,
           { encoding: "utf-8", timeout: 3000 },
         );
@@ -206,12 +208,12 @@ export class SidecarManager {
           const parts = line.trim().split(/\s+/);
           const pid = parts[parts.length - 1];
           if (pid && /^\d+$/.test(pid)) {
-            execSync(`taskkill /PID ${pid} /F`, { timeout: 3000 });
+            _exec(`taskkill /PID ${pid} /F`, { timeout: 3000 });
             return true;
           }
         }
       } else {
-        execSync(`lsof -ti:${port} | xargs kill -9`, { timeout: 3000 });
+        _exec(`lsof -ti:${port} | xargs kill -9`, { timeout: 3000 });
         return true;
       }
     } catch {
