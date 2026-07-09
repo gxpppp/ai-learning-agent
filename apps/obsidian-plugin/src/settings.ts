@@ -109,7 +109,7 @@ export class AISettingsTab extends PluginSettingTab {
                   const data = await resp.json();
                   p.models = data.models;
                   await this.plugin.saveSettings();
-                  renderProviders();
+                  this.display();
                 }
               } catch {
                 // server not running yet — silently skip
