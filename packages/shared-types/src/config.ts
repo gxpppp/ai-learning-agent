@@ -21,6 +21,8 @@ export interface IAppConfig {
   toolPermissions: "readonly" | "full";
   thinkingEnabled: boolean;
   reasoningEffort: "low" | "medium" | "high" | "max";
+  tavilyApiKey: string;
+  webSearchEnabled: boolean;
 }
 
 export const DEFAULT_PROVIDER: ILLMProvider = {
@@ -44,4 +46,6 @@ export const DEFAULT_CONFIG: IAppConfig = {
   toolPermissions: "readonly",
   thinkingEnabled: false,
   reasoningEffort: "high",
+  tavilyApiKey: "",
+  webSearchEnabled: false,
 };

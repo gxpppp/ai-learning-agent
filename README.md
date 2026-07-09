@@ -1,80 +1,93 @@
 # AI Learning Agent
 
-> AI-Native 学习增强系统 —— 一个像真人一样使用 Obsidian 的自主 Agent。
+> AI-Native 自主学习助手 —— 深度集成 Obsidian，像真人一样操作你的知识库。
 
-能够搜索知识库、创建/整理笔记、扫描文档、打标签、写总结、持续自我进化。基于 LLM + RAG + 工具调用的架构，通过 OpenAI 兼容 API 连接任意 LLM Provider。
+搜索、整理、创建笔记、扫描文档、打标签、联网搜索、持续进化。四层架构 + OpenHarness 多 Agent 协调引擎。
 
 ## 功能
 
-| 功能 | 说明 | 状态 |
-|---|---|---|
-| **AI Chat** | SSE 流式对话，支持多 Provider，全时 RAG 搜索知识库 | ✅ |
-| **Agent 工具调用** | AI 自主操作 Obsidian：创建/修改/移动/删除笔记、建文件夹、OCR 扫描 | ✅ |
-| **Thinking 思考模式** | DeepSeek V4 的 reasoning 过程可视化为可折叠块 | ✅ |
-| **RAG 知识引擎** | BGE-M3 嵌入 + LanceDB 向量库，自动引用来源 | ✅ |
-| **知识词云** | d3-cloud SVG 交互式词云，点击词搜索笔记 | ✅ |
-| **智能标签** | AI 自动推荐 frontmatter 标签 | ✅ |
-| **双链推荐** | AI 推荐笔记之间的 `[[内部链接]]` | ✅ |
-| **文档 OCR** | PaddleOCR PP-OCRv6（本地 GPU），图片提取文字 | ✅ |
-| **多文件上传** | 拖拽 PDF/图片入聊天区，自动 OCR → 归类 → 标签 | ✅ |
-| **文件监听** | 笔记变更自动同步向量索引和词云 | ✅ |
-| **多 Provider** | 支持多个 OpenAI 兼容提供商的添加/切换 | ✅ |
-| **反馈系统** | 👍/👎 按钮 → evolution/feedback.jsonl | ✅ |
-| **自进化引擎** | Eval Harness + Prompt 变异 + 沙箱测试（OpenHarness 思路） | ✅ |
+| 功能 | 说明 |
+|---|---|
+| **AI Chat** | SSE 流式对话，多 Provider，智能路由（简单/搜索/复杂） |
+| **Agent 工具调用** | 15 个工具：笔记 CRUD、文件夹管理、语义搜索、OCR、分类、摘要 |
+| **联网搜索** | Tavily 实时搜索，与本地 RAG 结果合并 |
+| **多 Agent 协调** | OpenHarness 引擎：Orchestrator→Searcher→Operator→Verifier |
+| **Thinking 思考** | DeepSeek V4 reasoning 可折叠块 |
+| **RAG 知识引擎** | BGE-M3 (GPU) + LanceDB 向量库，自动引用来源 |
+| **知识词云** | d3-cloud SVG 交互式词云，点击词跳转搜索 |
+| **知识图谱** | D3-force 图谱，拖拽+缩放，点击打开笔记 |
+| **自进化引擎** | Prompt 变异 + LLM-as-Judge + 自动部署 |
+| **文档 OCR** | PaddleOCR PP-OCRv6 (GPU) |
+| **文档导出** | VitePress 兼容的 vault 导出 |
+| **结构化日志** | JSON 格式 + trace_id + agent 标签 |
+| **会话持久化** | Markdown 人类可读 + JSONL 机器可恢复 |
+
+## 架构
+
+```
+Obsidian Plugin ──SSE──→ FastAPI Backend (PORT 8765)
+                            │
+                    ┌──── dispatcher ────┐
+                    │ classifies intent  │
+                    └───┬───┬───┬───────┘
+                        │   │   │
+            ┌───────────┘   │   └──────────────┐
+            ▼               ▼                  ▼
+         SIMPLE          SEARCH            COMPLEX
+      JSON plan         RAG+Tavily      OpenHarness
+      (legacy)          (router)        (coordinator)
+                                            │
+                                    15 BaseTools
+                                   ┌────┼────┐
+                                   │    │    │
+                               infra  llm  core
+                               (GPU) (API) (Vault)
+```
 
 ## 技术栈
 
 | 层 | 技术 |
 |---|---|
 | **Monorepo** | pnpm workspaces + Turborepo |
-| **Obsidian 插件** | TypeScript + esbuild + d3-cloud |
-| **AI 后端** | Python 3.11+ + FastAPI |
-| **LLM 客户端** | OpenAI SDK（DeepSeek / OpenAI / Ollama 兼容） |
-| **向量数据库** | LanceDB（嵌入式，零服务） |
-| **嵌入模型** | BGE-M3（568M，100+ 语言） |
-| **OCR** | PaddleOCR PP-OCRv6（GPU，中英文） |
-| **词云** | jieba 分词 + TF-IDF + d3-cloud 渲染 |
-| **代码质量** | Biome + Ruff + mypy + pytest (29 tests) |
-| **自进化** | OpenHarness 思路：Evaluator + Mutator + Runner |
+| **Obsidian 插件** | TypeScript + esbuild + d3/d3-cloud/d3-force |
+| **后端** | Python 3.11+ + FastAPI |
+| **Agent 引擎** | OpenHarness (OpenAI 兼容 Agent Loop) |
+| **向量数据库** | LanceDB (嵌入式) |
+| **嵌入模型** | BGE-M3 (GPU, 1024维) |
+| **OCR** | PaddleOCR PP-OCRv6 (GPU) |
+| **联网搜索** | Tavily API |
+| **代码质量** | Biome + Ruff + mypy + pytest (77 tests) |
 
 ## 项目结构
 
 ```
 ai-learning-agent/
-├── apps/
-│   └── obsidian-plugin/          # Obsidian 插件 (TypeScript, esbuild)
-│       ├── src/
-│       │   ├── main.ts           # 插件入口：注册视图/命令
-│       │   ├── sidecar.ts        # Python 后端进程管理 + 启动向导
-│       │   ├── settings.ts       # 多 Provider 设置面板
-│       │   ├── chat/             # 聊天、Agent SSE、ToolCall 渲染、上传
-│       │   ├── rag/              # RAG SSE 客户端
-│       │   ├── ocr/              # OCR 面板
-│       │   └── knowledge/        # 词云、标签推荐
-│       └── styles.css
+├── apps/obsidian-plugin/          # Obsidian 插件 (TypeScript)
+│   └── src/
+│       ├── main.ts                # 插件入口
+│       ├── sidecar.ts             # 后端进程管理
+│       ├── settings.ts            # 设置面板 (含 Tavily)
+│       ├── chat/                  # 聊天、Agent SSE、ToolCard
+│       ├── knowledge/             # 词云、知识图谱、标签推荐
+│       ├── ocr/                   # OCR 面板
+│       └── rag/                   # RAG 客户端
 │
-├── packages/
-│   └── shared-types/             # TypeScript 接口定义
+├── packages/shared-types/         # 共享 TypeScript 接口
 │
-├── python/
-│   └── backend/                  # FastAPI AI 后端
-│       ├── src/app/
-│       │   ├── main.py           # 应用入口 + lifespan
-│       │   ├── config.py         # 环境变量配置
-│       │   ├── constants.py      # 共享常量（路径、chunk 等）
-│       │   ├── routes/           # 13 个路由模块
-│       │   ├── services/         # 11 个服务模块
-│       │   ├── models/           # Pydantic 数据模型
-│       │   └── evolution/        # 自进化引擎
-│       ├── tests/                # pytest (29 cases)
-│       └── models/               # BGE-M3 本地存放
+├── python/backend/                # FastAPI 后端
+│   └── src/app/
+│       ├── api/                   # L2 HTTP 路由层 (13 模块)
+│       ├── core/                  # L2 核心枢纽 (dispatcher/vault/event_bus/tool_registry)
+│       ├── gateway/               # L3 网关层 (OpenHarness coordinator/router/memory/session)
+│       │   └── agents/            # 4 个 Agent 角色定义
+│       ├── infra/                 # L4a 本地 GPU 设施 (embedding/ocr/vector_store/wordcloud/graph)
+│       ├── llm/                   # L4b LLM 服务 (client/manager/prompts/search)
+│       ├── models/                # Pydantic 数据模型
+│       └── evolution/             # 自进化引擎
 │
-├── docs/                         # 设计文档
-├── .github/workflows/ci.yml      # CI/CD
-├── install.ps1                   # 一键安装脚本
-├── docker-compose.yml            # (可选) PaddleOCR-VL Docker
-├── turbo.json
-└── pnpm-workspace.yaml
+├── docs/                          # 设计文档
+├── tests/                         # pytest (77 cases)
+└── docker-compose.yml
 ```
 
 ## 快速开始
@@ -82,8 +95,8 @@ ai-learning-agent/
 ### 前置条件
 
 - **Node.js** >= 22 + **pnpm** >= 9
-- **Python** >= 3.11 + **uv** (包管理器)
-- **NVIDIA GPU** >= 6GB VRAM (RAG 的 BGE-M3 需要)
+- **Python** >= 3.11 + **uv**
+- **NVIDIA GPU** >= 6GB VRAM
 - **Obsidian** >= 1.5.0
 
 ### 安装
@@ -93,73 +106,83 @@ git clone https://github.com/gxpppp/ai-learning-agent.git
 cd ai-learning-agent
 pnpm install
 cd python/backend && uv sync && cd ../..
-
-# 一键安装到 Obsidian
-.\install.ps1 -VaultPath "C:\Users\你的用户名\你的Vault"
+.\install.ps1 -VaultPath "C:\Users\用户名\YourVault"
 ```
 
 ### 首次配置
 
 1. 重启 Obsidian → `Ctrl+P → Reload app without saving`
-2. 设置 → 启用 **AI Learning Agent** 插件
-3. 设置 → **AI Learning Agent** 面板：
+2. 设置 → 启用 **AI Learning Agent**
+3. 设置 → AI Learning Agent 面板：
    - Vault path：填你的 vault 绝对路径
-   - 在 Provider 卡片里填 **API key**
-   - Active Provider 下拉选择正确的
-4. 点底部的 **Save & Restart Backend**
+   - 填 Provider 的 **API key**
+   - (可选) 填 **Tavily API key** 开启联网搜索
+4. **Save & Restart Backend**
 5. `Ctrl+Shift+L` 打开聊天
 
-### 模型部署（首次需手动完成一次）
+### 模型部署
 
-| 模型 | 需手动操作 | 位置 |
+| 模型 | 方式 | 大小 |
 |---|---|---|
-| **BGE-M3** | 下载到 `backend/models/bge-m3/` | ~2.2GB，HuggingFace |
-| **PaddleOCR** | 插件首次使用时自动下载 | ~100MB，4 个子模型 |
+| **BGE-M3** | 下载到 `backend/models/bge-m3/` | ~2.2GB |
+| **PaddleOCR** | 首次使用自动下载 | ~100MB |
 
 ### 环境变量
 
 ```bash
 # LLM
-LLM_BASE_URL=https://api.deepseek.com/v1
-LLM_API_KEY=sk-xxx
-LLM_MODEL=deepseek-chat
+PROVIDERS_JSON=[{"id":"deepseek","name":"DeepSeek","baseUrl":"https://api.deepseek.com/v1","apiKey":"sk-xxx","models":["deepseek-chat"]}]
+ACTIVE_PROVIDER_ID=deepseek
 
 # RAG
 RAG_ENABLED=true
-EMBEDDING_MODEL=backend/models/bge-m3   # 本地路径
 AUTO_INDEX=true
 
-# OCR
-OCR_ENABLED=true
+# Web Search
+WEB_SEARCH_ENABLED=true
+TAVILY_API_KEY=tvly-xxx
+
+# Agent
+TOOL_PERMISSIONS=readonly
 
 # Thinking
 REASONING_ENABLED=true
-REASONING_EFFORT=high                    # low|medium|high|max
-
-# Agent
-TOOL_PERMISSIONS=readonly                # readonly|full
+REASONING_EFFORT=high
 ```
 
 ## 开发
 
 ```bash
-pnpm run dev          # 开发模式
+pnpm run dev          # 监听模式
 pnpm run build        # 构建
-pnpm run check-types  # TypeScript + Python 类型检查
+pnpm run check-types  # TS + Python 类型检查
 pnpm run lint         # Biome + Ruff
-uv run pytest -v      # Python 测试 (29 cases)
+uv run pytest -v      # 77 tests
 ```
 
-## 文档
+## API 端点 (25)
 
-| 文档 | 说明 |
-|---|---|
-| [PRD](ai_learning_agent_prd.md) | 产品需求规格说明书 |
-| [OCR 集成方案](docs/ocr-integration-plan.md) | Phase 1.5 设计 |
-| [知识引擎方案](docs/phase2-knowledge-engine-plan.md) | Phase 2 设计 |
-| [Agent 方案](docs/phase3-agent-plan.md) | Phase 3 设计 |
-| [部署指南](docs/deployment-guide.md) | 安装、模型、配置详解 |
-| [故障排查](docs/troubleshooting.md) | 常见错误 Q&A |
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/agent/chat` | 主聊天（智能路由） |
+| `POST` | `/api/chat/stream` | SSE 流式聊天 |
+| `POST` | `/api/rag/query` | RAG 向量搜索 |
+| `POST` | `/api/notes/*` | 笔记 CRUD (4 端点) |
+| `GET` | `/api/ocr/health` | OCR 状态 |
+| `POST` | `/api/ocr/parse` | OCR 识别 |
+| `POST` | `/api/ocr/parse-and-save` | OCR + 保存 |
+| `POST` | `/api/tags/suggest` | 标签建议 |
+| `POST` | `/api/links/recommend` | 双链推荐 |
+| `POST` | `/api/vault/index` | 索引 Vault |
+| `GET` | `/api/vault/status` | 索引状态 |
+| `POST` | `/api/wordcloud/generate` | 词云数据 |
+| `POST` | `/api/models/fetch` | 获取模型列表 |
+| `POST` | `/api/upload/` | 文件上传 |
+| `POST` | `/api/feedback` | 用户反馈 |
+| `GET` | `/api/graph/` | 知识图谱数据 |
+| `POST` | `/api/export/` | 文档导出 |
+| `POST` | `/api/evolution/sync` | 进化提示词同步 |
+| `GET` | `/api/evolution/active-prompt` | 当前进化提示词 |
 
 ## 路线图
 
@@ -167,9 +190,9 @@ uv run pytest -v      # Python 测试 (29 cases)
 Phase 1    ✅ 聊天 MVP (SSE + 笔记 CRUD)
 Phase 1.5  ✅ OCR 集成 (PaddleOCR)
 Phase 2    ✅ 知识引擎 (RAG + 标签 + 词云)
-Phase 2.5  ✅ 生产就绪 (部署 + 安装 + 启动向导)
-Phase 3    ✅ 自主 Agent (工具调用 + 多模型 + 思维 + 上传 + 反馈 + 自进化)
-Phase 4    ⏳ 多智能体 (Planner / Researcher / Tutor / Reviewer)
+Phase 2.5  ✅ 生产就绪 (部署 + 安装)
+Phase 3    ✅ 自主 Agent (工具调用 + 自进化 + 反馈)
+Phase 4    ✅ 多 Agent 协调 (OpenHarness + 网关 + 图谱)
 ```
 
 ## 许可证

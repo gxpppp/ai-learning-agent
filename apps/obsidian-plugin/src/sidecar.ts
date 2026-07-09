@@ -72,6 +72,8 @@ export class SidecarManager {
       SERVER_PORT: String(port),
       SERVER_HOST: host,
       OBSIDIAN_VAULT_PATH: this.config.vaultPath,
+      TAVILY_API_KEY: this.config.tavilyApiKey || "",
+      WEB_SEARCH_ENABLED: String(this.config.webSearchEnabled || false),
     };
 
     const pythonExe =

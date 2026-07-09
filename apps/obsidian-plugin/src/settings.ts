@@ -247,6 +247,32 @@ export class AISettingsTab extends PluginSettingTab {
           }),
       );
 
+    // ─── Web Search ───
+    containerEl.createEl("h3", { text: "Web Search (Tavily)" });
+    new Setting(containerEl)
+      .setName("Enable web search")
+      .setDesc("Let the AI search the internet for current information. Requires Tavily API key.")
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.settings.webSearchEnabled || false);
+        toggle.onChange(async (v) => {
+          this.plugin.settings.webSearchEnabled = v;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Tavily API key")
+      .setDesc("Get yours at https://tavily.com")
+      .addText((t) => {
+        t.inputEl.type = "password";
+        t.setPlaceholder("tvly-...")
+          .setValue(this.plugin.settings.tavilyApiKey || "")
+          .onChange(async (v) => {
+            this.plugin.settings.tavilyApiKey = v;
+            await this.plugin.saveSettings();
+          });
+      });
+
     // Save & Restart button
     containerEl.createEl("div", { cls: "ai-settings-save-bar" }, (bar) => {
       const btn = bar.createEl("button", { cls: "mod-cta", text: "Save & Restart Backend" });
