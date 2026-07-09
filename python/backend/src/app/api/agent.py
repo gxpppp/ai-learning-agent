@@ -202,7 +202,7 @@ async def _agent_loop(
             yield tool_call_event(f"local_{i}", tool_name, tool_args)
 
             t0 = asyncio.get_event_loop().time()
-            result = await execute_tool(tool_name, tool_args, OBSIDIAN_VAULT_PATH)
+            result = await execute_tool(tool_name, tool_args, OBSIDIAN_VAULT_PATH, trace_id=trace_id)
             elapsed = round((asyncio.get_event_loop().time() - t0) * 1000)
 
             yield tool_result_event(f"local_{i}", tool_name, result, elapsed)
