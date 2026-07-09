@@ -112,7 +112,7 @@ async def _agent_loop(
             permission_mode=TOOL_PERMISSIONS,
         )
 
-        async for event in coordinator.execute_simple(
+        async for event in coordinator.execute(
             user_message=user_message,
             system_prompt=system_prompt,
             provider_id=ACTIVE_PROVIDER_ID,

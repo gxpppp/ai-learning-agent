@@ -23,6 +23,7 @@ export class ChatView extends ItemView {
 
   private messages: ChatMessage[] = [];
   private messagesEl!: HTMLElement;
+  private agentStatusEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
   private uploadZone!: UploadZone;
   private sendBtn!: HTMLElement;
@@ -66,6 +67,8 @@ export class ChatView extends ItemView {
     }
 
     this.buildMessageArea(container);
+    this.agentStatusEl = container.createDiv({ cls: "ai-agent-status-bar" });
+    this.agentStatusEl.style.display = "none";
     this.buildUploadZone(container);
     this.buildInputBar(container);
     await this.loadLastSession();
@@ -219,9 +222,11 @@ export class ChatView extends ItemView {
             this.scrollToBottomIfDesired();
           } else if (eventType === "agent_start") {
             toolRenderer.renderAgentMarker(parsed.agent, "start", parsed.task);
+            this.showAgentStatus(parsed.agent, parsed.task || "");
             this.scrollToBottomIfDesired();
           } else if (eventType === "agent_end") {
             toolRenderer.renderAgentMarker(parsed.agent, "end");
+            this.hideAgentStatus();
             this.scrollToBottomIfDesired();
           }
         } catch { /* skip */ }
@@ -243,6 +248,31 @@ export class ChatView extends ItemView {
   }
 
   abortStreaming(): void { this.abortController?.abort(); }
+
+  private showAgentStatus(agent: string, task: string): void {
+    this.agentStatusEl.style.display = "block";
+    const icons: Record<string, string> = {
+      orchestrator: "🧩", searcher: "🔍", operator: "⚙️", verifier: "✅",
+    };
+    const icon = icons[agent] || "🤖";
+    const steps = ["orchestrator", "searcher", "operator", "verifier"];
+    const currentIdx = steps.indexOf(agent);
+    let html = "";
+    for (let i = 0; i < steps.length; i++) {
+      const active = i === currentIdx;
+      const done = i < currentIdx;
+      const icon = icons[steps[i]] || "⬤";
+      html += `<span class="${active ? "ai-status-active" : done ? "ai-status-done" : "ai-status-pending"}">
+        ${done ? "✅" : icon} ${steps[i]}
+      </span>${i < steps.length - 1 ? " → " : ""}`;
+    }
+    html += `<span class="ai-status-task">: ${task.slice(0, 50)}</span>`;
+    this.agentStatusEl.innerHTML = html;
+  }
+
+  private hideAgentStatus(): void {
+    setTimeout(() => { this.agentStatusEl.style.display = "none"; }, 2000);
+  }
 
   private addMessage(role: "user" | "assistant" | "system", content: string): ChatMessage {
     const msg: ChatMessage = { id: crypto.randomUUID(), role, content, timestamp: Date.now() };

@@ -348,3 +348,85 @@ class TestEvolutionBridge:
             result = inject_evolved_prompt("Base prompt", tmpdir)
             assert "Base prompt" in result
             assert "concise" in result
+
+
+class TestGatewayCoordinator:
+    """Test GatewayCoordinator initialization and event mapping."""
+
+    def test_coordinator_init(self):
+        from app.gateway.coordinator import GatewayCoordinator
+
+        c = GatewayCoordinator("/tmp/test-vault", "readonly")
+        assert c.vault_path == "/tmp/test-vault"
+        assert c.permission_mode == "readonly"
+
+    def test_map_text_event(self):
+        from app.gateway.coordinator import GatewayCoordinator
+        from openharness.engine.stream_events import AssistantTextDelta
+
+        c = GatewayCoordinator("/tmp/vault")
+        result = c._map_event(AssistantTextDelta(text="Hello world"))
+        assert result is not None
+        assert "event: token" in result
+        assert "Hello world" in result
+
+    def test_map_tool_start_event(self):
+        from app.gateway.coordinator import GatewayCoordinator
+        from openharness.engine.stream_events import ToolExecutionStarted
+
+        c = GatewayCoordinator("/tmp/vault")
+        result = c._map_event(ToolExecutionStarted(
+            tool_name="search_notes",
+            tool_input={"query": "rust"},
+        ))
+        assert result is not None
+        assert "event: tool_call" in result
+        assert "search_notes" in result
+
+    def test_map_tool_complete_event(self):
+        from app.gateway.coordinator import GatewayCoordinator
+        from openharness.engine.stream_events import ToolExecutionCompleted
+
+        c = GatewayCoordinator("/tmp/vault")
+        result = c._map_event(ToolExecutionCompleted(
+            tool_name="read_note",
+            output='{"path": "test.md", "content": "hello"}',
+            is_error=False,
+        ))
+        assert result is not None
+        assert "event: tool_result" in result
+        assert "read_note" in result
+
+    def test_map_error_event(self):
+        from app.gateway.coordinator import GatewayCoordinator
+        from openharness.engine.stream_events import ErrorEvent
+
+        c = GatewayCoordinator("/tmp/vault")
+        result = c._map_event(ErrorEvent(message="Something broke", recoverable=False))
+        assert result is not None
+        assert "event: error" in result
+        assert "Something broke" in result
+
+    def test_map_unknown_event_returns_none(self):
+        from app.gateway.coordinator import GatewayCoordinator
+        from openharness.engine.stream_events import StatusEvent
+
+        c = GatewayCoordinator("/tmp/vault")
+        result = c._map_event(StatusEvent(message="status update"))
+        assert result is None
+
+    def test_get_coordinator_singleton(self):
+        from app.gateway.coordinator import GatewayCoordinator, coordinator, get_coordinator
+
+        # Reset singleton for test
+        import app.gateway.coordinator as gc_mod
+        gc_mod.coordinator = None
+
+        c1 = get_coordinator("/vault1", "readonly")
+        assert isinstance(c1, GatewayCoordinator)
+        assert c1.vault_path == "/vault1"
+
+        # Second call returns same instance
+        c2 = get_coordinator("/vault2", "full")
+        assert c2 is c1
+        assert c2.vault_path == "/vault1"  # not updated
