@@ -1,36 +1,51 @@
-"""BGE-M3 embedding client via sentence-transformers.
-
-BGE-M3 produces 1024-dim dense vectors + sparse lexical weights.
-Supports 100+ languages including Chinese and English.
-"""
+"""BGE-M3 embedding service — HTTP client for Docker-hosted embedding API."""
 
 from __future__ import annotations
 
-from sentence_transformers import SentenceTransformer
+import logging
 
-MODEL_NAME = "BAAI/bge-m3"
+logger = logging.getLogger(__name__)
 
 
 class EmbeddingClient:
-    def __init__(self, model_name: str = MODEL_NAME) -> None:
-        self.model = SentenceTransformer(model_name)
+    """HTTP client for the Docker-hosted BGE-M3 embedding service."""
 
-    def encode(self, texts: list[str]) -> list[list[float]]:
-        embeddings = self.model.encode(
-            texts,
-            normalize_embeddings=True,
-            show_progress_bar=False,
-        )
-        return [emb.tolist() for emb in embeddings]
-
-    def encode_query(self, text: str) -> list[float]:
-        embedding = self.model.encode(
-            text,
-            normalize_embeddings=True,
-            prompt_name="query",
-        )
-        return embedding.tolist()
+    def __init__(self, server_url: str = "http://127.0.0.1:8081"):
+        self._server_url = server_url.rstrip("/")
+        self._dimension: int | None = None
 
     @property
     def dimension(self) -> int:
-        return self.model.get_sentence_embedding_dimension()
+        if self._dimension is None:
+            self._dimension = 1024  # BGE-M3 default
+        return self._dimension
+
+    def encode(self, texts: list[str]) -> list[list[float]]:
+        """Encode a batch of texts to embeddings."""
+        import httpx
+        try:
+            r = httpx.post(
+                f"{self._server_url}/embed",
+                json={"texts": texts},
+                timeout=60,
+            )
+            r.raise_for_status()
+            return r.json()["vectors"]
+        except Exception:
+            logger.exception("Embedding API call failed")
+            raise
+
+    def encode_query(self, text: str) -> list[float]:
+        """Encode a single query with BGE-M3 query prompt."""
+        import httpx
+        try:
+            r = httpx.post(
+                f"{self._server_url}/embed_query",
+                json={"text": text},
+                timeout=30,
+            )
+            r.raise_for_status()
+            return r.json()["vector"]
+        except Exception:
+            logger.exception("Embedding query API call failed")
+            raise

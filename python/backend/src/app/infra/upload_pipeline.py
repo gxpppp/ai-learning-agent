@@ -65,11 +65,11 @@ async def process_upload(
     # Step 2: Vectorize the resulting .md
     chunks = 0
     try:
-        from app.config import EMBEDDING_MODEL, RAG_ENABLED
+        from app.config import EMBEDDING_SERVER_URL, RAG_ENABLED
         if RAG_ENABLED:
             from app.infra.embedding import EmbeddingClient
             from app.infra.indexer import index_note
-            emb = EmbeddingClient(EMBEDDING_MODEL)
+            emb = EmbeddingClient(EMBEDDING_SERVER_URL)
             chunk_count = index_note(md_path, vault_path, emb, None)  # type: ignore[arg-type]
             chunks = chunk_count if isinstance(chunk_count, int) else 0
     except Exception:

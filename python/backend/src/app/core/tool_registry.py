@@ -326,7 +326,7 @@ def _is_binary(file_path: str) -> bool:
 
 
 async def _search_notes(args: dict, vault_path: str) -> str:
-    from app.config import EMBEDDING_MODEL
+    from app.config import EMBEDDING_SERVER_URL
     from app.infra.embedding import EmbeddingClient
     from app.infra.vector_store import VectorStore
 
@@ -334,7 +334,7 @@ async def _search_notes(args: dict, vault_path: str) -> str:
     if store.count() == 0:
         return json.dumps({"results": [], "message": "Vault not indexed yet. Use /api/vault/index first."})
 
-    emb = EmbeddingClient(EMBEDDING_MODEL)
+    emb = EmbeddingClient(EMBEDDING_SERVER_URL)
     query_vec = emb.encode_query(args["query"])
     results = store.search(query_vec, top_k=args.get("top_k", 5))
     return json.dumps({
@@ -373,25 +373,25 @@ def _list_folder(args: dict, vault_path: str) -> str:
 
 
 def _suggest_tags(args: dict, vault_path: str) -> str:
-    from app.config import EMBEDDING_MODEL
+    from app.config import EMBEDDING_SERVER_URL
     from app.infra.embedding import EmbeddingClient
     from app.infra.tag_engine import suggest_tags as _st
     from app.infra.vector_store import VectorStore
 
     store = VectorStore(vault_path)
-    emb = EmbeddingClient(EMBEDDING_MODEL)
+    emb = EmbeddingClient(EMBEDDING_SERVER_URL)
     result = _st(args["note_path"], vault_path, emb, store, args.get("max_tags", 5))
     return json.dumps(result)
 
 
 def _recommend_links(args: dict, vault_path: str) -> str:
-    from app.config import EMBEDDING_MODEL
+    from app.config import EMBEDDING_SERVER_URL
     from app.infra.embedding import EmbeddingClient
     from app.infra.tag_engine import recommend_links as _rl
     from app.infra.vector_store import VectorStore
 
     store = VectorStore(vault_path)
-    emb = EmbeddingClient(EMBEDDING_MODEL)
+    emb = EmbeddingClient(EMBEDDING_SERVER_URL)
     result = _rl(args["note_path"], vault_path, emb, store, args.get("max_links", 5))
     return json.dumps(result)
 
@@ -568,12 +568,12 @@ async def _index_single_note(args: dict, vault_path: str) -> str:
     if not os.path.exists(full):
         return json.dumps({"error": f"File not found: {note_path}"})
 
-    from app.config import EMBEDDING_MODEL
+    from app.config import EMBEDDING_SERVER_URL
     from app.infra.embedding import EmbeddingClient
     from app.infra.indexer import index_note
     from app.infra.vector_store import VectorStore
 
-    emb = EmbeddingClient(EMBEDDING_MODEL)
+    emb = EmbeddingClient(EMBEDDING_SERVER_URL)
     store = VectorStore(vault_path)
     chunks = index_note(full, vault_path, emb, store)
     return json.dumps({"indexed": note_path, "chunks": chunks})

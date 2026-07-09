@@ -34,6 +34,7 @@ from app.api.wordcloud import router as wordcloud_router
 from app.config import (
     AUTO_INDEX,
     EMBEDDING_MODEL,
+    EMBEDDING_SERVER_URL,
     OBSIDIAN_VAULT_PATH,
     PROVIDERS_JSON,
     RAG_ENABLED,
@@ -72,7 +73,8 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     if RAG_ENABLED and OBSIDIAN_VAULT_PATH:
         logger.info(f"[server] Initializing embedding model: {EMBEDDING_MODEL}...")
         from app.infra.embedding import EmbeddingClient
-        embedding_client = EmbeddingClient(EMBEDDING_MODEL)
+        logger.info(f"[server] Initializing embedding client: {EMBEDDING_SERVER_URL}")
+        embedding_client = EmbeddingClient(EMBEDDING_SERVER_URL)
         logger.info(f"[server] Embedding dim={embedding_client.dimension} loaded.")
 
         logger.info(f"[server] Initializing vector store at {OBSIDIAN_VAULT_PATH}/.ai-tutor/lancedb")
