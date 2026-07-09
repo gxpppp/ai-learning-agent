@@ -71,7 +71,7 @@ export class SidecarManager {
       EMBEDDING_MODEL: path.join(this.getProjectRoot(), "models", "bge-m3"),
       SERVER_PORT: String(port),
       SERVER_HOST: host,
-      OBSIDIAN_VAULT_PATH: this.config.vaultPath,
+      OBSIDIAN_VAULT_PATH: this.vaultPath,
       TAVILY_API_KEY: this.config.tavilyApiKey || "",
       WEB_SEARCH_ENABLED: String(this.config.webSearchEnabled || false),
     };

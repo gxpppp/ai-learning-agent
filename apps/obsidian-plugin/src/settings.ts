@@ -19,17 +19,26 @@ export class AISettingsTab extends PluginSettingTab {
 
     // ─── Vault ───
     containerEl.createEl("h3", { text: "Vault" });
+    const vaultPath = (this.app.vault.adapter as unknown as { basePath?: string }).basePath || "";
     new Setting(containerEl)
       .setName("Vault path")
-      .setDesc("Absolute path to your Obsidian vault")
+      .setDesc(`Auto-detected from Obsidian: ${vaultPath}`)
       .addText((text) =>
         text
-          .setPlaceholder("C:/Users/.../YourVault")
-          .setValue(this.plugin.settings.vaultPath)
+          .setPlaceholder(vaultPath || "Auto-detected")
+          .setValue(vaultPath || this.plugin.settings.vaultPath)
           .onChange(async (value) => {
             this.plugin.settings.vaultPath = value;
             await this.plugin.saveSettings();
           }),
+      )
+      .addExtraButton((btn) =>
+        btn.setIcon("reset").setTooltip("Auto-fill from Obsidian").onClick(async () => {
+          const detected = (this.app.vault.adapter as unknown as { basePath?: string }).basePath || "";
+          this.plugin.settings.vaultPath = detected;
+          await this.plugin.saveSettings();
+          this.display();
+        }),
       );
 
     // ─── Providers ───

@@ -227,6 +227,13 @@ export default class AILearningAgentPlugin extends Plugin {
 
     this.settings = { ...DEFAULT_CONFIG, ...data };
 
+    // Auto-fill vault path if empty or mismatch
+    const actualPath = this.getVaultBasePath();
+    if (!this.settings.vaultPath || this.settings.vaultPath !== actualPath) {
+      this.settings.vaultPath = actualPath;
+      await this.saveSettings();
+    }
+
     // One-time migration: only if providers array is empty
     const old = rawData as { llm?: { baseUrl: string; apiKey: string; model: string } };
     if (old?.llm && (!data.providers || (data.providers as Array<unknown>).length === 0)) {
