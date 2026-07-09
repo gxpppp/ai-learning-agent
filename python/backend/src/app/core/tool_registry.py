@@ -396,8 +396,6 @@ def _move_note(args: dict, vault_path: str) -> str:
 
 
 async def _ocr_document(args: dict, vault_path: str) -> str:
-    import base64
-
     file_path = args.get("file_path") or args.get("image_path", "")
     if not os.path.isabs(file_path):
         file_path = os.path.join(vault_path, file_path)
@@ -406,32 +404,16 @@ async def _ocr_document(args: dict, vault_path: str) -> str:
 
     output_folder = args.get("output_folder", "OCR")
     stem = Path(file_path).stem
-    md = f"# {stem}\n\n*OCR not available. Enable it with OCR_ENABLED=true.*"
 
-    # Try OCR endpoint if available
+    from app.infra.ocr import extract_text
+
     try:
-        from app.config import OCR_ENABLED, OCR_MODEL, OCR_SERVER_URL
-        if OCR_ENABLED:
-            from app.llm.client import LLMClient
-            ocr = LLMClient(OCR_SERVER_URL, "not-needed", OCR_MODEL)
-            with open(file_path, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode()
-            ext = os.path.splitext(file_path)[1].lower()
-            mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".pdf": "application/pdf"}
-            mime = mime_map.get(ext, "application/octet-stream")
-            resp = await ocr.async_client.chat.completions.create(
-                model=OCR_MODEL,
-                messages=[{"role": "user", "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-                    {"type": "text", "text": "OCR: Extract all text. Output as Markdown."},
-                ]}],
-                temperature=0.0,
-            )
-            extracted = resp.choices[0].message.content or ""
-            if extracted.strip():
-                md = extracted
-    except Exception:
-        pass  # keep default md
+        md = await extract_text(file_path)
+    except Exception as exc:
+        md = f"# {stem}\n\n*OCR failed: {exc}*"
+
+    if not md.strip():
+        md = f"# {stem}\n\n*No text extracted from this document.*"
 
     # Save to vault
     out_dir = _safe_path(vault_path, output_folder)

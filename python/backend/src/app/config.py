@@ -29,8 +29,6 @@ SERVER_HOST = os.getenv("SERVER_HOST", "127.0.0.1")
 
 OBSIDIAN_VAULT_PATH = os.getenv("OBSIDIAN_VAULT_PATH", "")
 
-OCR_SERVER_URL = os.getenv("OCR_SERVER_URL", "http://127.0.0.1:8080/v1")
-OCR_MODEL = os.getenv("OCR_MODEL", "PaddleOCR-VL-0.9B")
 OCR_ENABLED = os.getenv("OCR_ENABLED", "false").lower() == "true"
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
