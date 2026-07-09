@@ -195,8 +195,10 @@ export class SidecarManager {
   }
 
   private killPortProcess(port: number): boolean {
-    // Use local require to avoid esbuild TDZ on execSync
-    const { execSync: _exec } = require("node:child_process") as typeof import("node:child_process");
+    // Local require avoids esbuild bundled closure TDZ
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const cp = require("node:child_process");
+    const _exec = cp.execSync as typeof execSync;
     try {
       if (process.platform === "win32") {
         const out = _exec(
