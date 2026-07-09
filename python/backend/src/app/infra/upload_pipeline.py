@@ -41,20 +41,24 @@ async def process_upload(
         file_type = "text"
     elif ext == ".pdf":
         # PDF: PyMuPDF + PaddleOCR
-        from app.infra.ocr import extract_text
-        md_content = await extract_text(raw_path)
+        try:
+            from app.infra.ocr import extract_text
+            md_content = await extract_text(raw_path)
+        except Exception as e:
+            logger.exception("PDF OCR failed")
+            return {"status": "error", "reason": f"OCR failed: {e}", "name": f"{stem}.pdf"}
         os.makedirs(target_dir, exist_ok=True)
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(md_content)
         file_type = "pdf"
     elif ext in PROCESSABLE_EXTENSIONS:
         # Image: PaddleOCR
-        from app.infra.ocr import extract_text
-        md_content = await extract_text(raw_path)
-        os.makedirs(target_dir, exist_ok=True)
-        with open(md_path, "w", encoding="utf-8") as f:
-            f.write(md_content)
-        file_type = "image"
+        try:
+            from app.infra.ocr import extract_text
+            md_content = await extract_text(raw_path)
+        except Exception as e:
+            logger.exception("Image OCR failed")
+            return {"status": "error", "reason": f"OCR failed: {e}", "name": f"{stem}{ext}"}
     else:
         return {"status": "skipped", "reason": f"Unsupported format: {ext}"}
 

@@ -12,6 +12,10 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+os.environ.setdefault("PADDLE_PDX_DEVICE", "cpu")
+os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+os.environ.setdefault("FLAGS_pir_execution_mode", "0")
+
 SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".webp", ".pdf"}
 
 _ocr_engine = None
@@ -21,9 +25,13 @@ def get_ocr_engine():
     """Lazy-load PaddleOCR engine (singleton)."""
     global _ocr_engine
     if _ocr_engine is None:
-        from paddleocr import PaddleOCR
-        _ocr_engine = PaddleOCR(lang="ch", use_angle_cls=True)
-        logger.info("PaddleOCR engine loaded")
+        try:
+            from paddleocr import PaddleOCR
+            _ocr_engine = PaddleOCR(lang="ch", use_angle_cls=True, ocr_version="PP-OCRv4")
+            logger.info("PaddleOCR engine loaded")
+        except Exception as e:
+            logger.error(f"PaddleOCR init failed: {e}")
+            raise
     return _ocr_engine
 
 
